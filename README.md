@@ -116,5 +116,5 @@ npm test
 ## Author
 
 **Mohammed Hamoud**  
-B.Sc. Computer Science — TU Dortmund  
-[LinkedIn Profile](https://www.linkedin.com/in/mohammed-hamoud-732215201/) | [GitHub Profile](https://github.com/hamoudmohammed)
+B.Sc. in Computer Science — TU Dortmund  
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/mohammed-hamoud-732215201/)
