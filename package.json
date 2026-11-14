@@ -1,0 +1,28 @@
+{
+  "name": "appointment-api",
+  "version": "1.0.0",
+  "description": "Production-ready REST API for appointment management built with TypeScript, Node.js, and clean architecture.",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "test": "tsx --test tests/**/*.test.ts",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "typescript",
+    "nodejs",
+    "rest-api",
+    "clean-architecture",
+    "backend"
+  ],
+  "author": "Mohammed Hamoud",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
