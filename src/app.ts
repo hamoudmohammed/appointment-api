@@ -83,7 +83,8 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       const body = await parseJsonBody(req);
       const result = appointmentService.create(body as CreateAppointmentDTO);
       if (!result.success) {
-        sendJson(res, 400, { error: result.error });
+        const statusCode = result.errorType === 'CONFLICT' ? 409 : 400;
+        sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
         return;
       }
       sendJson(res, 201, { message: 'Appointment created successfully', data: result.data });

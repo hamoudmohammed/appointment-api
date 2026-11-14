@@ -22,11 +22,26 @@ export class AppointmentService {
   }
 
   public create(dto: CreateAppointmentDTO): ServiceResult<Appointment> {
+    // 1. Syntax & Format Validation
     const validationError = this.validateDTO(dto);
     if (validationError) {
-      return { success: false, error: validationError };
+      return { success: false, error: validationError, errorType: 'VALIDATION_ERROR' };
     }
 
+    // 2. Domain Rule: Prevent double booking for the same slot
+    const slotTaken = this.appointments.some(
+      (item) => item.date === dto.date && item.time === dto.time && item.status === 'CONFIRMED'
+    );
+
+    if (slotTaken) {
+      return {
+        success: false,
+        error: `Time slot on ${dto.date} at ${dto.time} is already booked. Please choose another time.`,
+        errorType: 'CONFLICT'
+      };
+    }
+
+    // 3. Persist new appointment
     const newAppointment: Appointment = {
       id: this.nextId++,
       customer: dto.customer.trim(),

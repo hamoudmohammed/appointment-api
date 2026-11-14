@@ -45,6 +45,19 @@ describe('AppointmentService', () => {
     assert.strictEqual(all.length, 2);
   });
 
+  test('create() prevents double-booking the same date and time slot (CONFLICT)', () => {
+    // Attempting to book the seed slot (2026-11-20 at 10:00)
+    const duplicate = service.create({
+      customer: 'Another Customer',
+      date: '2026-11-20',
+      time: '10:00'
+    });
+
+    assert.strictEqual(duplicate.success, false);
+    assert.strictEqual(duplicate.errorType, 'CONFLICT');
+    assert.match(duplicate.error || '', /already booked/i);
+  });
+
   test('create() rejects appointment with empty customer name', () => {
     const result = service.create({
       customer: '   ',
@@ -53,6 +66,7 @@ describe('AppointmentService', () => {
     });
 
     assert.strictEqual(result.success, false);
+    assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
     assert.match(result.error || '', /required/i);
   });
 
@@ -64,6 +78,7 @@ describe('AppointmentService', () => {
     });
 
     assert.strictEqual(result.success, false);
+    assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
     assert.match(result.error || '', /YYYY-MM-DD/);
   });
 
@@ -75,6 +90,7 @@ describe('AppointmentService', () => {
     });
 
     assert.strictEqual(result.success, false);
+    assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
     assert.match(result.error || '', /HH:mm/);
   });
 });
