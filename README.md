@@ -5,6 +5,8 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
 [![Tests](https://img.shields.io/badge/Tests-Native%20Node%20Runner-brightgreen.svg)](#testing)
+[![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED.svg)](Dockerfile)
+[![CI](https://github.com/hamoudmohammed/appointment-api/actions/workflows/ci.yml/badge.svg)](https://github.com/hamoudmohammed/appointment-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -94,6 +96,19 @@ npm run build
 npm start
 ```
 
+### Running with Docker
+
+Run the containerized application locally with Docker or Docker Compose:
+
+```bash
+# Using Docker Compose
+docker compose up -d
+
+# Or build and run standalone container
+docker build -t appointment-api .
+docker run -d -p 3000:3000 --name appointment-api appointment-api
+```
+
 ### Testing
 Run automated unit tests covering service logic, edge cases, and validation rules:
 ```bash
@@ -107,8 +122,8 @@ npm test
 - [x] Initial TypeScript REST API with clean layer separation
 - [x] Input validation & defensive error handling
 - [x] Automated unit testing suite
-- [ ] Containerization with multi-stage Dockerfile
-- [ ] Automated CI/CD pipeline using GitHub Actions (Lint, Test, Docker Build)
+- [x] Containerization with multi-stage Dockerfile
+- [x] Automated CI/CD pipeline using GitHub Actions (Lint, Test, Docker Build)
 - [ ] Infrastructure as Code (Terraform) for AWS deployment
 
 ---
