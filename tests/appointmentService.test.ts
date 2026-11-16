@@ -93,4 +93,124 @@ describe('AppointmentService', () => {
     assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
     assert.match(result.error || '', /HH:mm/);
   });
+
+  describe('update()', () => {
+    test('successfully updates customer name', () => {
+      const result = service.update(1, { customer: 'Max Updated' });
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(result.data?.customer, 'Max Updated');
+      assert.strictEqual(result.data?.date, '2026-11-20');
+      assert.strictEqual(result.data?.time, '10:00');
+    });
+
+    test('successfully reschedules date and time', () => {
+      const result = service.update(1, { date: '2026-11-25', time: '15:00' });
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(result.data?.date, '2026-11-25');
+      assert.strictEqual(result.data?.time, '15:00');
+    });
+
+    test('allows updating own details without self-slot conflict', () => {
+      // Re-saving with same date and time should not trigger CONFLICT
+      const result = service.update(1, { customer: 'Max Same Slot', date: '2026-11-20', time: '10:00' });
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(result.data?.customer, 'Max Same Slot');
+    });
+
+    test('prevents rescheduling to a slot taken by another confirmed appointment (CONFLICT)', () => {
+      // Create a second appointment
+      service.create({
+        customer: 'Jane Doe',
+        date: '2026-11-21',
+        time: '11:00'
+      });
+
+      // Try to update appointment 1 to appointment 2's slot
+      const conflictResult = service.update(1, {
+        date: '2026-11-21',
+        time: '11:00'
+      });
+
+      assert.strictEqual(conflictResult.success, false);
+      assert.strictEqual(conflictResult.errorType, 'CONFLICT');
+      assert.match(conflictResult.error || '', /already booked/i);
+    });
+
+    test('returns NOT_FOUND for non-existent appointment ID', () => {
+      const result = service.update(999, { customer: 'Ghost' });
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.errorType, 'NOT_FOUND');
+    });
+
+    test('rejects empty update object', () => {
+      const result = service.update(1, {});
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
+    });
+
+    test('rejects invalid date format', () => {
+      const result = service.update(1, { date: '20-11-2026' });
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
+    });
+
+    test('rejects invalid time format', () => {
+      const result = service.update(1, { time: '99:00' });
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
+    });
+
+    test('rejects invalid status value', () => {
+      // @ts-expect-error testing runtime validation with invalid status
+      const result = service.update(1, { status: 'UNKNOWN' });
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
+    });
+
+    test('cancelling an appointment frees up the slot for new booking', () => {
+      const cancelResult = service.update(1, { status: 'CANCELLED' });
+      assert.strictEqual(cancelResult.success, true);
+      assert.strictEqual(cancelResult.data?.status, 'CANCELLED');
+
+      // Now another user can book the 2026-11-20 10:00 slot
+      const newBooking = service.create({
+        customer: 'New Booker',
+        date: '2026-11-20',
+        time: '10:00'
+      });
+
+      assert.strictEqual(newBooking.success, true);
+      assert.strictEqual(newBooking.data?.customer, 'New Booker');
+    });
+  });
+
+  describe('delete()', () => {
+    test('successfully deletes an existing appointment', () => {
+      const result = service.delete(1);
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(result.data?.id, 1);
+
+      // Verify it is no longer returned
+      assert.strictEqual(service.getById(1), undefined);
+      assert.strictEqual(service.getAll().length, 0);
+    });
+
+    test('returns NOT_FOUND when deleting non-existent ID', () => {
+      const result = service.delete(999);
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.errorType, 'NOT_FOUND');
+    });
+
+    test('deleting an appointment frees its slot', () => {
+      service.delete(1);
+
+      const rebook = service.create({
+        customer: 'Re-booker',
+        date: '2026-11-20',
+        time: '10:00'
+      });
+
+      assert.strictEqual(rebook.success, true);
+    });
+  });
 });

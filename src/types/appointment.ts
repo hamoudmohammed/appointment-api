@@ -15,6 +15,13 @@ export interface CreateAppointmentDTO {
   time: string;
 }
 
+export interface UpdateAppointmentDTO {
+  customer?: string;
+  date?: string;
+  time?: string;
+  status?: AppointmentStatus;
+}
+
 export type ServiceErrorType = 'VALIDATION_ERROR' | 'CONFLICT' | 'NOT_FOUND';
 
 export interface ServiceResult<T> {

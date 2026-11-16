@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { AppointmentService } from './services/appointmentService.js';
-import { CreateAppointmentDTO } from './types/appointment.js';
+import { CreateAppointmentDTO, UpdateAppointmentDTO } from './types/appointment.js';
 
 const appointmentService = new AppointmentService();
 
@@ -75,6 +75,34 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         return;
       }
       sendJson(res, 200, { data: item });
+      return;
+    }
+
+    // PATCH /appointments/:id
+    if (method === 'PATCH' && singleMatch) {
+      const id = parseInt(singleMatch[1], 10);
+      const body = await parseJsonBody(req);
+      const result = appointmentService.update(id, body as UpdateAppointmentDTO);
+      if (!result.success) {
+        let statusCode = 400;
+        if (result.errorType === 'NOT_FOUND') statusCode = 404;
+        else if (result.errorType === 'CONFLICT') statusCode = 409;
+        sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, { message: 'Appointment updated successfully', data: result.data });
+      return;
+    }
+
+    // DELETE /appointments/:id
+    if (method === 'DELETE' && singleMatch) {
+      const id = parseInt(singleMatch[1], 10);
+      const result = appointmentService.delete(id);
+      if (!result.success) {
+        sendJson(res, 404, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, { message: 'Appointment deleted successfully', data: result.data });
       return;
     }
 

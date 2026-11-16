@@ -33,7 +33,9 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/health` | Liveness & health check probe | `200` |
 | `GET` | `/appointments` | List all scheduled appointments | `200` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
-| `POST` | `/appointments` | Create a new appointment with validation | `201`, `400`, `413` |
+| `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |
+| `PATCH` | `/appointments/:id` | Update customer, reschedule date/time, or cancel status | `200`, `400`, `404`, `409` |
+| `DELETE` | `/appointments/:id` | Remove an appointment and free its time slot | `200`, `404` |
 
 ### Example Payloads
 
@@ -61,10 +63,50 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 }
 ```
 
-#### Error Response (`400 Bad Request`)
+#### Update / Reschedule Request (`PATCH /appointments/:id`)
 ```json
 {
-  "error": "Field \"date\" is required and must follow YYYY-MM-DD format."
+  "date": "2026-12-05",
+  "time": "16:00",
+  "status": "CONFIRMED"
+}
+```
+
+#### Update Success Response (`200 OK`)
+```json
+{
+  "message": "Appointment updated successfully",
+  "data": {
+    "id": 1,
+    "customer": "Max Mustermann",
+    "date": "2026-12-05",
+    "time": "16:00",
+    "status": "CONFIRMED",
+    "createdAt": "2026-11-14T10:00:00.000Z"
+  }
+}
+```
+
+#### Delete Success Response (`200 OK`)
+```json
+{
+  "message": "Appointment deleted successfully",
+  "data": {
+    "id": 1,
+    "customer": "Max Mustermann",
+    "date": "2026-11-20",
+    "time": "10:00",
+    "status": "CONFIRMED",
+    "createdAt": "2026-11-14T10:00:00.000Z"
+  }
+}
+```
+
+#### Error Response (`400 Bad Request` / `409 Conflict`)
+```json
+{
+  "error": "Time slot on 2026-11-20 at 10:00 is already booked. Please choose another time.",
+  "errorType": "CONFLICT"
 }
 ```
 
