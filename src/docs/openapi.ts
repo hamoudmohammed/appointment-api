@@ -1,0 +1,351 @@
+export const openApiSpec = {
+  openapi: '3.0.3',
+  info: {
+    title: 'Appointment REST API',
+    version: '1.0.0',
+    description: 'A clean, production-ready REST API for appointment scheduling built with TypeScript and native Node.js HTTP primitives following Clean Architecture principles.',
+    contact: {
+      name: 'Mohammed Hamoud',
+      url: 'https://github.com/hamoudmohammed/appointment-api'
+    },
+    license: {
+      name: 'MIT',
+      url: 'https://opensource.org/licenses/MIT'
+    }
+  },
+  servers: [
+    {
+      url: '/',
+      description: 'Current Environment'
+    }
+  ],
+  tags: [
+    {
+      name: 'System',
+      description: 'Health & monitoring probes'
+    },
+    {
+      name: 'Appointments',
+      description: 'Appointment lifecycle management operations'
+    }
+  ],
+  paths: {
+    '/health': {
+      get: {
+        tags: ['System'],
+        summary: 'Liveness & health probe',
+        description: 'Returns the server health status and current ISO timestamp.',
+        responses: {
+          '200': {
+            description: 'Server is healthy',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', example: 'healthy' },
+                    timestamp: { type: 'string', format: 'date-time', example: '2026-11-16T15:00:00.000Z' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/appointments': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'List all appointments',
+        description: 'Returns all scheduled appointments sorted chronologically.',
+        responses: {
+          '200': {
+            description: 'List of appointments successfully retrieved',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    count: { type: 'integer', example: 1 },
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Appointment' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      post: {
+        tags: ['Appointments'],
+        summary: 'Create a new appointment',
+        description: 'Books a new appointment slot with domain validation and double-booking conflict prevention.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreateAppointmentDTO' }
+            }
+          }
+        },
+        responses: {
+          '201': {
+            description: 'Appointment created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Appointment created successfully' },
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Validation Error (e.g. invalid date/time format or missing customer name)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          '409': {
+            description: 'Conflict - Slot is already booked by another confirmed appointment',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          '413': {
+            description: 'Payload Too Large (max 1 MB allowed)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/appointments/{id}': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'Get appointment by ID',
+        description: 'Retrieves an appointment by its unique numeric ID.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'Unique numeric appointment ID',
+            schema: { type: 'integer', example: 1 }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Appointment found',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      patch: {
+        tags: ['Appointments'],
+        summary: 'Update or reschedule appointment',
+        description: 'Updates appointment details, reschedules date/time (with conflict detection), or cancels status.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'Unique numeric appointment ID',
+            schema: { type: 'integer', example: 1 }
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/UpdateAppointmentDTO' }
+            }
+          }
+        },
+        responses: {
+          '200': {
+            description: 'Appointment successfully updated',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Appointment updated successfully' },
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Validation Error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          '409': {
+            description: 'Conflict - Target slot already taken by another confirmed booking',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      delete: {
+        tags: ['Appointments'],
+        summary: 'Delete appointment',
+        description: 'Removes an appointment permanently and frees its time slot.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'Unique numeric appointment ID',
+            schema: { type: 'integer', example: 1 }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Appointment successfully deleted',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Appointment deleted successfully' },
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  components: {
+    schemas: {
+      Appointment: {
+        type: 'object',
+        required: ['id', 'customer', 'date', 'time', 'status', 'createdAt'],
+        properties: {
+          id: { type: 'integer', example: 1 },
+          customer: { type: 'string', example: 'Max Mustermann' },
+          date: { type: 'string', format: 'date', example: '2026-11-20', description: 'YYYY-MM-DD' },
+          time: { type: 'string', example: '10:00', description: 'HH:mm (24h format)' },
+          status: { type: 'string', enum: ['CONFIRMED', 'CANCELLED'], example: 'CONFIRMED' },
+          createdAt: { type: 'string', format: 'date-time', example: '2026-11-14T10:00:00.000Z' }
+        }
+      },
+      CreateAppointmentDTO: {
+        type: 'object',
+        required: ['customer', 'date', 'time'],
+        properties: {
+          customer: { type: 'string', example: 'Sarah Connor' },
+          date: { type: 'string', format: 'date', example: '2026-12-01', description: 'YYYY-MM-DD' },
+          time: { type: 'string', example: '14:30', description: 'HH:mm (24h format)' }
+        }
+      },
+      UpdateAppointmentDTO: {
+        type: 'object',
+        properties: {
+          customer: { type: 'string', example: 'Sarah Connor Updated' },
+          date: { type: 'string', format: 'date', example: '2026-12-02' },
+          time: { type: 'string', example: '15:00' },
+          status: { type: 'string', enum: ['CONFIRMED', 'CANCELLED'], example: 'CONFIRMED' }
+        }
+      },
+      ErrorResponse: {
+        type: 'object',
+        required: ['error'],
+        properties: {
+          error: { type: 'string', example: 'Time slot on 2026-11-20 at 10:00 is already booked.' },
+          errorType: { type: 'string', example: 'CONFLICT' }
+        }
+      }
+    }
+  }
+};
+
+export const swaggerUiHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointment REST API - Documentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css" />
+  <style>
+    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+    *, *:before, *:after { box-sizing: inherit; }
+    body { margin: 0; background: #fafafa; }
+    .topbar { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = function() {
+      SwaggerUIBundle({
+        url: '/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+        layout: 'BaseLayout'
+      });
+    };
+  </script>
+</body>
+</html>`;

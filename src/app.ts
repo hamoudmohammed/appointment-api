@@ -1,6 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { AppointmentService } from './services/appointmentService.js';
 import { CreateAppointmentDTO, UpdateAppointmentDTO } from './types/appointment.js';
+import { openApiSpec, swaggerUiHtml } from './docs/openapi.js';
 
 const appointmentService = new AppointmentService();
 
@@ -46,6 +47,14 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown): void 
   res.end(JSON.stringify(data));
 }
 
+function sendHtml(res: ServerResponse, statusCode: number, html: string): void {
+  res.writeHead(statusCode, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'X-Content-Type-Options': 'nosniff'
+  });
+  res.end(html);
+}
+
 export async function requestHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const url = new URL(req.url ?? '/', `http://${req.headers.host || 'localhost'}`);
@@ -55,6 +64,18 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     // Health check endpoint (vital for Docker, Kubernetes, AWS ALB)
     if (method === 'GET' && pathname === '/health') {
       sendJson(res, 200, { status: 'healthy', timestamp: new Date().toISOString() });
+      return;
+    }
+
+    // Interactive Swagger UI documentation
+    if (method === 'GET' && (pathname === '/docs' || pathname === '/docs/')) {
+      sendHtml(res, 200, swaggerUiHtml);
+      return;
+    }
+
+    // OpenAPI 3.0 specification JSON
+    if (method === 'GET' && pathname === '/openapi.json') {
+      sendJson(res, 200, openApiSpec);
       return;
     }
 

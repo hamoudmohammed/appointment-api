@@ -29,6 +29,25 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.status, 'healthy');
   });
 
+  test('GET /openapi.json returns 200 and valid OpenAPI 3.0 schema', async () => {
+    const res = await fetch(`${baseUrl}/openapi.json`);
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(data.openapi, '3.0.3');
+    assert.strictEqual(data.info.title, 'Appointment REST API');
+    assert.ok(data.paths['/appointments']);
+    assert.ok(data.paths['/appointments/{id}']);
+  });
+
+  test('GET /docs returns 200 and HTML with Swagger UI', async () => {
+    const res = await fetch(`${baseUrl}/docs`);
+    const html = await res.text();
+    assert.strictEqual(res.status, 200);
+    assert.match(res.headers.get('content-type') || '', /text\/html/);
+    assert.match(html, /swagger-ui/i);
+    assert.match(html, /\/openapi\.json/);
+  });
+
   test('GET /appointments returns list with count', async () => {
     const res = await fetch(`${baseUrl}/appointments`);
     const data = await res.json();

@@ -4,6 +4,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-85EA2D.svg?logo=openapi-initiative&logoColor=black)](#interactive-documentation-swagger-ui)
 [![Tests](https://img.shields.io/badge/Tests-Native%20Node%20Runner-brightgreen.svg)](#testing)
 [![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED.svg)](Dockerfile)
 [![CI](https://github.com/hamoudmohammed/appointment-api/actions/workflows/ci.yml/badge.svg)](https://github.com/hamoudmohammed/appointment-api/actions/workflows/ci.yml)
@@ -30,12 +31,25 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 
 | Method | Endpoint | Description | Status Codes |
 |---|---|---|---|
+| `GET` | `/docs` | Interactive Swagger UI API documentation | `200` |
+| `GET` | `/openapi.json` | OpenAPI 3.0.3 specification schema | `200` |
 | `GET` | `/health` | Liveness & health check probe | `200` |
 | `GET` | `/appointments` | List all scheduled appointments | `200` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
 | `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |
 | `PATCH` | `/appointments/:id` | Update customer, reschedule date/time, or cancel status | `200`, `400`, `404`, `409` |
 | `DELETE` | `/appointments/:id` | Remove an appointment and free its time slot | `200`, `404` |
+
+---
+
+## Interactive Documentation (Swagger UI)
+
+The API includes a built-in, zero-dependency interactive **Swagger UI** interface:
+
+- **Swagger UI Console:** [http://localhost:3000/docs](http://localhost:3000/docs)
+- **OpenAPI 3.0 Schema:** [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
+
+You can explore all request schemas, response codes, and test endpoints directly inside your browser with the **"Try it out"** button.
 
 ### Example Payloads
 
