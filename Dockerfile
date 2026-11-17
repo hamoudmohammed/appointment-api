@@ -15,6 +15,9 @@ RUN npm ci
 COPY src ./src
 RUN npm run build
 
+# Prune devDependencies to keep only production packages (e.g. pg driver)
+RUN npm prune --production
+
 # ==========================================
 # Stage 2: Production Runner
 # ==========================================
@@ -27,10 +30,9 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0
 
-# Copy only the compiled JavaScript files and package.json
-# Note: Since the core API uses native Node.js HTTP primitives,
-# no runtime node_modules are needed in the final production image.
+# Copy production dependencies, compiled JavaScript files, and package.json
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
 # Security: Run as non-root user (built-in alpine node user, uid 1000)

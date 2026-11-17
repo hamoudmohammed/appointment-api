@@ -1,27 +1,21 @@
 import { Appointment, CreateAppointmentDTO, UpdateAppointmentDTO, ServiceResult } from '../types/appointment.js';
+import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
+import { InMemoryAppointmentRepository } from '../repositories/inMemoryAppointmentRepository.js';
 
 export class AppointmentService {
-  private appointments: Appointment[] = [
-    {
-      id: 1,
-      customer: 'Max Mustermann',
-      date: '2026-11-20',
-      time: '10:00',
-      status: 'CONFIRMED',
-      createdAt: '2026-11-14T10:00:00.000Z'
-    }
-  ];
-  private nextId = 2;
+  constructor(
+    private readonly repository: IAppointmentRepository = new InMemoryAppointmentRepository()
+  ) {}
 
-  public getAll(): Appointment[] {
-    return [...this.appointments];
+  public async getAll(): Promise<Appointment[]> {
+    return this.repository.findAll();
   }
 
-  public getById(id: number): Appointment | undefined {
-    return this.appointments.find((item) => item.id === id);
+  public async getById(id: number): Promise<Appointment | undefined> {
+    return this.repository.findById(id);
   }
 
-  public create(dto: CreateAppointmentDTO): ServiceResult<Appointment> {
+  public async create(dto: CreateAppointmentDTO): Promise<ServiceResult<Appointment>> {
     // 1. Syntax & Format Validation
     const validationError = this.validateDTO(dto);
     if (validationError) {
@@ -29,10 +23,7 @@ export class AppointmentService {
     }
 
     // 2. Domain Rule: Prevent double booking for the same slot
-    const slotTaken = this.appointments.some(
-      (item) => item.date === dto.date && item.time === dto.time && item.status === 'CONFIRMED'
-    );
-
+    const slotTaken = await this.repository.findConfirmedBySlot(dto.date, dto.time);
     if (slotTaken) {
       return {
         success: false,
@@ -41,31 +32,36 @@ export class AppointmentService {
       };
     }
 
-    // 3. Persist new appointment
-    const newAppointment: Appointment = {
-      id: this.nextId++,
-      customer: dto.customer.trim(),
-      date: dto.date,
-      time: dto.time,
-      status: 'CONFIRMED',
-      createdAt: new Date().toISOString()
-    };
-
-    this.appointments.push(newAppointment);
-    return { success: true, data: newAppointment };
+    // 3. Persist new appointment (with database-level unique constraint handling)
+    try {
+      const newAppointment = await this.repository.create({
+        customer: dto.customer.trim(),
+        date: dto.date,
+        time: dto.time,
+        status: 'CONFIRMED'
+      });
+      return { success: true, data: newAppointment };
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
+        return {
+          success: false,
+          error: `Time slot on ${dto.date} at ${dto.time} is already booked. Please choose another time.`,
+          errorType: 'CONFLICT'
+        };
+      }
+      throw err;
+    }
   }
 
-  public update(id: number, dto: UpdateAppointmentDTO): ServiceResult<Appointment> {
-    const appointmentIndex = this.appointments.findIndex((item) => item.id === id);
-    if (appointmentIndex === -1) {
+  public async update(id: number, dto: UpdateAppointmentDTO): Promise<ServiceResult<Appointment>> {
+    const current = await this.repository.findById(id);
+    if (!current) {
       return {
         success: false,
         error: `Appointment with ID ${id} not found.`,
         errorType: 'NOT_FOUND'
       };
     }
-
-    const current = this.appointments[appointmentIndex];
 
     // Validation
     const validationError = this.validateUpdateDTO(dto);
@@ -79,14 +75,7 @@ export class AppointmentService {
 
     // Check slot conflict if the status is CONFIRMED
     if (targetStatus === 'CONFIRMED') {
-      const slotTaken = this.appointments.some(
-        (item) =>
-          item.id !== id &&
-          item.date === targetDate &&
-          item.time === targetTime &&
-          item.status === 'CONFIRMED'
-      );
-
+      const slotTaken = await this.repository.findConfirmedBySlot(targetDate, targetTime, id);
       if (slotTaken) {
         return {
           success: false,
@@ -97,21 +86,38 @@ export class AppointmentService {
     }
 
     // Apply updates
-    const updatedAppointment: Appointment = {
-      ...current,
-      customer: dto.customer !== undefined ? dto.customer.trim() : current.customer,
-      date: targetDate,
-      time: targetTime,
-      status: targetStatus
-    };
+    try {
+      const updatedAppointment = await this.repository.update(id, {
+        customer: dto.customer !== undefined ? dto.customer.trim() : undefined,
+        date: dto.date,
+        time: dto.time,
+        status: dto.status
+      });
 
-    this.appointments[appointmentIndex] = updatedAppointment;
-    return { success: true, data: updatedAppointment };
+      if (!updatedAppointment) {
+        return {
+          success: false,
+          error: `Appointment with ID ${id} not found.`,
+          errorType: 'NOT_FOUND'
+        };
+      }
+
+      return { success: true, data: updatedAppointment };
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
+        return {
+          success: false,
+          error: `Time slot on ${targetDate} at ${targetTime} is already booked. Please choose another time.`,
+          errorType: 'CONFLICT'
+        };
+      }
+      throw err;
+    }
   }
 
-  public delete(id: number): ServiceResult<Appointment> {
-    const index = this.appointments.findIndex((item) => item.id === id);
-    if (index === -1) {
+  public async delete(id: number): Promise<ServiceResult<Appointment>> {
+    const deleted = await this.repository.delete(id);
+    if (!deleted) {
       return {
         success: false,
         error: `Appointment with ID ${id} not found.`,
@@ -119,7 +125,6 @@ export class AppointmentService {
       };
     }
 
-    const [deleted] = this.appointments.splice(index, 1);
     return { success: true, data: deleted };
   }
 

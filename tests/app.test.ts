@@ -1,7 +1,9 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { requestHandler } from '../src/app.js';
+import { requestHandler, setAppointmentService } from '../src/app.js';
+import { AppointmentService } from '../src/services/appointmentService.js';
+import { InMemoryAppointmentRepository } from '../src/repositories/inMemoryAppointmentRepository.js';
 
 describe('HTTP API Endpoints', () => {
   let server: http.Server;
@@ -16,6 +18,10 @@ describe('HTTP API Endpoints', () => {
         resolve();
       });
     });
+  });
+
+  beforeEach(() => {
+    setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
   });
 
   after(async () => {

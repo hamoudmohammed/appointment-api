@@ -1,9 +1,10 @@
 # Appointment REST API
 
-A clean, production-ready REST API for appointment scheduling built with **TypeScript** and **Node.js**. Designed following Clean Architecture principles, strict type safety, input validation, and automated testing.
+A clean, production-ready REST API for appointment scheduling built with **TypeScript**, **Node.js**, and **PostgreSQL**. Designed following Clean Architecture principles, strict type safety, input validation, automated testing, and cloud-ready containerization.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-green.svg)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-85EA2D.svg?logo=openapi-initiative&logoColor=black)](#interactive-documentation-swagger-ui)
 [![Tests](https://img.shields.io/badge/Tests-Native%20Node%20Runner-brightgreen.svg)](#testing)
 [![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED.svg)](Dockerfile)
@@ -14,16 +15,22 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 
 ## Architecture & Design Decisions
 
-- **Separation of Concerns:** 
+- **Separation of Concerns & Repository Pattern:** 
   - `types/`: Strict TypeScript data models and DTOs (Data Transfer Objects).
-  - `services/`: Encapsulated business logic and in-memory repository without HTTP dependencies.
+  - `repositories/`: Abstract `IAppointmentRepository` interface with `PostgresAppointmentRepository` for production/cloud environments (e.g., AWS RDS) and `InMemoryAppointmentRepository` for blazing-fast, isolated automated testing.
+  - `services/`: Encapsulated domain business logic, input validation, and conflict detection decoupled from HTTP layers and database drivers.
+  - `db/`: Connection pooling (`pg.Pool`), automated schema verification, index optimization, and graceful connection teardown.
   - `app.ts`: HTTP request dispatcher, payload size security limits, and standardized JSON responses.
-  - `server.ts`: Server bootstrapping, environment port binding, and graceful shutdown handling (`SIGTERM`/`SIGINT`).
-- **Resilience & Security:** 
+  - `server.ts`: Server bootstrapping, dependency injection, environment port binding, and graceful shutdown handling (`SIGTERM`/`SIGINT`).
+- **Resilience & Concurrency Safety:** 
+  - **Zero Race Conditions:** Double-booking prevention is enforced both in the application domain layer and at the database engine level using a conditional unique index:
+    ```sql
+    CREATE UNIQUE INDEX idx_unique_confirmed_slot ON appointments (date, time) WHERE status = 'CONFIRMED';
+    ```
+    Cancelled appointments automatically liberate the time slot.
   - Strict payload size limit (1 MB max) to prevent memory exhaustion / DoS attacks.
-  - Defends against invalid JSON and improper HTTP methods with clean HTTP status codes (`400`, `404`, `413`, `500`).
+  - Defends against invalid JSON and improper HTTP methods with clean HTTP status codes (`400`, `404`, `409`, `413`, `500`).
   - Native health check endpoint (`/health`) ready for container orchestrators (Docker, Kubernetes, AWS ECS/ALB).
-- **Zero-Dependency Core:** Implemented using native Node.js HTTP primitives and standard libraries to demonstrate deep fundamental knowledge of the runtime, without unnecessary external framework bloat.
 
 ---
 
@@ -129,8 +136,9 @@ You can explore all request schemas, response codes, and test endpoints directly
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v20+ recommended)
+- Node.js (v20+ recommended, v22 LTS tested)
 - npm
+- Docker & Docker Compose (optional for local PostgreSQL)
 
 ### Installation
 ```bash
@@ -139,34 +147,43 @@ cd appointment-api
 npm install
 ```
 
-### Running Locally
+### Running with Docker Compose (Recommended)
+
+Start the API and PostgreSQL container stack together with automated health checks and persistent volume storage:
 
 ```bash
-# Start in development mode with auto-reload
-npm run dev
+docker compose up -d
+```
 
-# Compile TypeScript
+- API: [http://localhost:3000](http://localhost:3000)
+- Swagger UI: [http://localhost:3000/docs](http://localhost:3000/docs)
+- PostgreSQL Database: `localhost:5432` (database: `appointments_db`, user: `postgres`)
+
+### Running Locally without Docker
+
+You can run the API locally using an in-memory repository (ideal for quick testing and environments without Docker running):
+
+```bash
+# Start in development mode with In-Memory storage
+USE_IN_MEMORY=true npm run dev
+
+# Or connect to an external PostgreSQL instance
+# (configure DB_HOST, DB_USER, DB_PASSWORD, DB_NAME in .env)
+npm run dev
+```
+
+### Production Build
+
+```bash
+# Compile TypeScript to dist/
 npm run build
 
-# Start compiled production server
+# Start production server
 npm start
 ```
 
-### Running with Docker
-
-Run the containerized application locally with Docker or Docker Compose:
-
-```bash
-# Using Docker Compose
-docker compose up -d
-
-# Or build and run standalone container
-docker build -t appointment-api .
-docker run -d -p 3000:3000 --name appointment-api appointment-api
-```
-
 ### Testing
-Run automated unit tests covering service logic, edge cases, and validation rules:
+Run automated unit and integration tests covering repository operations, service domain logic, and HTTP endpoints:
 ```bash
 npm test
 ```
@@ -180,7 +197,8 @@ npm test
 - [x] Automated unit testing suite
 - [x] Containerization with multi-stage Dockerfile
 - [x] Automated CI/CD pipeline using GitHub Actions (Lint, Test, Docker Build)
-- [ ] Infrastructure as Code (Terraform) for AWS deployment
+- [x] Persistent Database integration (PostgreSQL with Repository Pattern & Docker Compose)
+- [ ] Infrastructure as Code (Terraform) for AWS deployment (RDS PostgreSQL + ECS Fargate)
 
 ---
 

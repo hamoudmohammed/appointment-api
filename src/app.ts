@@ -3,7 +3,15 @@ import { AppointmentService } from './services/appointmentService.js';
 import { CreateAppointmentDTO, UpdateAppointmentDTO } from './types/appointment.js';
 import { openApiSpec, swaggerUiHtml } from './docs/openapi.js';
 
-const appointmentService = new AppointmentService();
+let currentService = new AppointmentService();
+
+export function setAppointmentService(service: AppointmentService): void {
+  currentService = service;
+}
+
+export function getAppointmentService(): AppointmentService {
+  return currentService;
+}
 
 // Maximum allowed payload size: 1 MB
 const MAX_PAYLOAD_SIZE = 1024 * 1024;
@@ -81,16 +89,18 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
 
     // GET /appointments
     if (method === 'GET' && pathname === '/appointments') {
-      const all = appointmentService.getAll();
+      const all = await currentService.getAll();
       sendJson(res, 200, { count: all.length, data: all });
       return;
     }
 
-    // GET /appointments/:id
+    // Single appointment routes (/appointments/:id)
     const singleMatch = pathname.match(/^\/appointments\/(\d+)$/);
+
+    // GET /appointments/:id
     if (method === 'GET' && singleMatch) {
       const id = parseInt(singleMatch[1], 10);
-      const item = appointmentService.getById(id);
+      const item = await currentService.getById(id);
       if (!item) {
         sendJson(res, 404, { error: `Appointment with ID ${id} not found.` });
         return;
@@ -103,7 +113,7 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     if (method === 'PATCH' && singleMatch) {
       const id = parseInt(singleMatch[1], 10);
       const body = await parseJsonBody(req);
-      const result = appointmentService.update(id, body as UpdateAppointmentDTO);
+      const result = await currentService.update(id, body as UpdateAppointmentDTO);
       if (!result.success) {
         let statusCode = 400;
         if (result.errorType === 'NOT_FOUND') statusCode = 404;
@@ -118,7 +128,7 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     // DELETE /appointments/:id
     if (method === 'DELETE' && singleMatch) {
       const id = parseInt(singleMatch[1], 10);
-      const result = appointmentService.delete(id);
+      const result = await currentService.delete(id);
       if (!result.success) {
         sendJson(res, 404, { error: result.error, errorType: result.errorType });
         return;
@@ -130,7 +140,7 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     // POST /appointments
     if (method === 'POST' && pathname === '/appointments') {
       const body = await parseJsonBody(req);
-      const result = appointmentService.create(body as CreateAppointmentDTO);
+      const result = await currentService.create(body as CreateAppointmentDTO);
       if (!result.success) {
         const statusCode = result.errorType === 'CONFLICT' ? 409 : 400;
         sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
