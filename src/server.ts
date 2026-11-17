@@ -19,20 +19,29 @@ async function bootstrap(): Promise<void> {
     setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
   } else {
     const config = getDatabaseConfig();
-    console.log(
-      `[appointment-api] Connecting to PostgreSQL at ${config.host || 'remote'}:${config.port || 5432}/${config.database || ''}...`
-    );
-
     try {
+      console.log(
+        `[appointment-api] Connecting to PostgreSQL at ${config.host || 'localhost'}:${config.port || 5432}/${config.database || ''}...`
+      );
       pool = createDatabasePool(config);
       await initializeDatabase(pool);
       const postgresRepo = new PostgresAppointmentRepository(pool);
       setAppointmentService(new AppointmentService(postgresRepo));
       console.log('[appointment-api] Successfully connected to PostgreSQL and initialized repository.');
     } catch (err) {
-      console.error('[appointment-api] Failed to connect to PostgreSQL database:', err);
-      console.warn('[appointment-api] Tip: Ensure PostgreSQL is running via `docker compose up -d` or set USE_IN_MEMORY=true.');
-      process.exit(1);
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[appointment-api] Fatal: Failed to connect to PostgreSQL in production:', err);
+        process.exit(1);
+      } else {
+        console.warn(
+          '[appointment-api] PostgreSQL is not running locally. Falling back to In-Memory storage for development.'
+        );
+        console.warn(
+          '[appointment-api] (To connect with PostgreSQL, start Docker Desktop and run: docker compose up -d)'
+        );
+        pool = undefined;
+        setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
+      }
     }
   }
 
