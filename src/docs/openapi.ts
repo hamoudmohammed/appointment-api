@@ -33,18 +33,80 @@ export const openApiSpec = {
     '/health': {
       get: {
         tags: ['System'],
-        summary: 'Liveness & health probe',
-        description: 'Returns the server health status and current ISO timestamp.',
+        summary: 'Liveness probe (process uptime & memory)',
+        description: 'Returns server health, uptime in seconds, and memory metrics.',
         responses: {
           '200': {
-            description: 'Server is healthy',
+            description: 'Server process is alive',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
                     status: { type: 'string', example: 'healthy' },
-                    timestamp: { type: 'string', format: 'date-time', example: '2026-11-16T15:00:00.000Z' }
+                    timestamp: { type: 'string', format: 'date-time', example: '2026-11-18T12:00:00.000Z' },
+                    uptimeSeconds: { type: 'integer', example: 120 },
+                    memory: {
+                      type: 'object',
+                      properties: {
+                        rssMb: { type: 'number', example: 45.2 },
+                        heapUsedMb: { type: 'number', example: 22.4 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/health/ready': {
+      get: {
+        tags: ['System'],
+        summary: 'Database readiness probe',
+        description: 'Performs an active database ping (SELECT 1) and inspects connection pool metrics.',
+        responses: {
+          '200': {
+            description: 'Database is healthy and ready to serve queries',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', example: 'healthy' },
+                    timestamp: { type: 'string', format: 'date-time' },
+                    database: {
+                      type: 'object',
+                      properties: {
+                        status: { type: 'string', example: 'healthy' },
+                        storage: { type: 'string', example: 'postgresql' },
+                        latencyMs: { type: 'number', example: 1.25 },
+                        pool: {
+                          type: 'object',
+                          properties: {
+                            total: { type: 'integer', example: 10 },
+                            idle: { type: 'integer', example: 9 },
+                            waiting: { type: 'integer', example: 0 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '503': {
+            description: 'Database is unreachable or degraded',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', example: 'unhealthy' },
+                    timestamp: { type: 'string', format: 'date-time' },
+                    database: { type: 'object' }
                   }
                 }
               }

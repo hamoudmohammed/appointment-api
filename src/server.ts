@@ -1,8 +1,13 @@
 import { createServer, Server } from 'node:http';
 import pg from 'pg';
-import { requestHandler, setAppointmentService } from './app.js';
+import { requestHandler, setAppointmentService, setDatabaseHealthChecker } from './app.js';
 import { AppointmentService } from './services/appointmentService.js';
-import { createDatabasePool, initializeDatabase, getDatabaseConfig } from './db/pool.js';
+import {
+  createDatabasePool,
+  initializeDatabase,
+  getDatabaseConfig,
+  checkDatabaseHealth
+} from './db/pool.js';
 import { PostgresAppointmentRepository } from './repositories/postgresAppointmentRepository.js';
 import { InMemoryAppointmentRepository } from './repositories/inMemoryAppointmentRepository.js';
 
@@ -17,6 +22,7 @@ async function bootstrap(): Promise<void> {
   if (USE_IN_MEMORY) {
     console.log('[appointment-api] Running with In-Memory storage (USE_IN_MEMORY=true).');
     setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
+    setDatabaseHealthChecker(() => checkDatabaseHealth(undefined));
   } else {
     const config = getDatabaseConfig();
     try {
@@ -27,6 +33,7 @@ async function bootstrap(): Promise<void> {
       await initializeDatabase(pool);
       const postgresRepo = new PostgresAppointmentRepository(pool);
       setAppointmentService(new AppointmentService(postgresRepo));
+      setDatabaseHealthChecker(() => checkDatabaseHealth(pool));
       console.log('[appointment-api] Successfully connected to PostgreSQL and initialized repository.');
     } catch (err) {
       if (process.env.NODE_ENV === 'production') {
@@ -41,6 +48,7 @@ async function bootstrap(): Promise<void> {
         );
         pool = undefined;
         setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
+        setDatabaseHealthChecker(() => checkDatabaseHealth(undefined));
       }
     }
   }

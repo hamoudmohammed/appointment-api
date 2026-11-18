@@ -43,7 +43,8 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 |---|---|---|---|
 | `GET` | `/docs` | Interactive Swagger UI API documentation | `200` |
 | `GET` | `/openapi.json` | OpenAPI 3.0.3 specification schema | `200` |
-| `GET` | `/health` | Liveness & health check probe | `200` |
+| `GET` | `/health` / `/health/live` | Liveness probe (uptime & memory metrics) | `200` |
+| `GET` | `/health/ready` | Database readiness probe (active ping & pool statistics) | `200`, `503` |
 | `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`) | `200`, `400` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
 | `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |

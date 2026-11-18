@@ -13,9 +13,17 @@ import {
   MemoryRateLimiter
 } from './utils/security.js';
 import { Logger } from './utils/logger.js';
+import { DatabaseHealthStatus } from './db/pool.js';
+
+export type DatabaseHealthChecker = () => Promise<DatabaseHealthStatus>;
 
 let currentService = new AppointmentService();
 let currentRateLimiter = new MemoryRateLimiter();
+let currentDbHealthChecker: DatabaseHealthChecker = async () => ({
+  status: 'healthy',
+  storage: 'in-memory',
+  latencyMs: 0
+});
 
 export function setAppointmentService(service: AppointmentService): void {
   currentService = service;
@@ -31,6 +39,14 @@ export function setRateLimiter(limiter: MemoryRateLimiter): void {
 
 export function getRateLimiter(): MemoryRateLimiter {
   return currentRateLimiter;
+}
+
+export function setDatabaseHealthChecker(checker: DatabaseHealthChecker): void {
+  currentDbHealthChecker = checker;
+}
+
+export function getDatabaseHealthChecker(): DatabaseHealthChecker {
+  return currentDbHealthChecker;
 }
 
 // Maximum allowed payload size: 1 MB
@@ -108,9 +124,30 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     const { pathname } = url;
     const method = req.method?.toUpperCase();
 
-    // Health check endpoint (exempt from rate limiting, vital for Docker, Kubernetes, AWS ALB)
-    if (method === 'GET' && pathname === '/health') {
-      sendJson(res, 200, { status: 'healthy', timestamp: new Date().toISOString() });
+    // Health & Liveness probes (exempt from rate limiting, vital for Docker, Kubernetes, AWS ALB)
+    if (method === 'GET' && (pathname === '/health' || pathname === '/health/live')) {
+      const memoryUsage = process.memoryUsage();
+      sendJson(res, 200, {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptimeSeconds: Math.floor(process.uptime()),
+        memory: {
+          rssMb: Number((memoryUsage.rss / 1024 / 1024).toFixed(2)),
+          heapUsedMb: Number((memoryUsage.heapUsed / 1024 / 1024).toFixed(2))
+        }
+      });
+      return;
+    }
+
+    // Database Readiness probe (verifies database connectivity and connection pool health)
+    if (method === 'GET' && pathname === '/health/ready') {
+      const dbStatus = await currentDbHealthChecker();
+      const statusCode = dbStatus.status === 'healthy' ? 200 : 503;
+      sendJson(res, statusCode, {
+        status: dbStatus.status,
+        timestamp: new Date().toISOString(),
+        database: dbStatus
+      });
       return;
     }
 

@@ -43,7 +43,7 @@ EXPOSE 3000
 
 # Container Orchestrator Health Check (Docker, Kubernetes, AWS ECS)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/health/ready || exit 1
 
 # Start the compiled production server
 CMD ["node", "dist/server.js"]

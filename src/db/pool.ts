@@ -92,3 +92,55 @@ export async function initializeDatabase(pool: pg.Pool): Promise<void> {
     client.release();
   }
 }
+
+export interface DatabaseHealthStatus {
+  status: 'healthy' | 'unhealthy';
+  storage: 'postgresql' | 'in-memory';
+  latencyMs: number;
+  pool?: {
+    total: number;
+    idle: number;
+    waiting: number;
+  } | undefined;
+  error?: string | undefined;
+}
+
+export async function checkDatabaseHealth(pool?: pg.Pool): Promise<DatabaseHealthStatus> {
+  if (!pool) {
+    return {
+      status: 'healthy',
+      storage: 'in-memory',
+      latencyMs: 0
+    };
+  }
+
+  const start = performance.now();
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('SELECT 1');
+      const latencyMs = Number((performance.now() - start).toFixed(2));
+      return {
+        status: 'healthy',
+        storage: 'postgresql',
+        latencyMs,
+        pool: {
+          total: pool.totalCount,
+          idle: pool.idleCount,
+          waiting: pool.waitingCount
+        }
+      };
+    } finally {
+      client.release();
+    }
+  } catch (err: unknown) {
+    const latencyMs = Number((performance.now() - start).toFixed(2));
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      status: 'unhealthy',
+      storage: 'postgresql',
+      latencyMs,
+      error: message
+    };
+  }
+}

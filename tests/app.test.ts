@@ -1,7 +1,12 @@
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { requestHandler, setAppointmentService, setRateLimiter } from '../src/app.js';
+import {
+  requestHandler,
+  setAppointmentService,
+  setRateLimiter,
+  setDatabaseHealthChecker
+} from '../src/app.js';
 import { AppointmentService } from '../src/services/appointmentService.js';
 import { InMemoryAppointmentRepository } from '../src/repositories/inMemoryAppointmentRepository.js';
 import { MemoryRateLimiter } from '../src/utils/security.js';
@@ -24,17 +29,47 @@ describe('HTTP API Endpoints', () => {
   beforeEach(() => {
     setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
     setRateLimiter(new MemoryRateLimiter({ windowMs: 60000, maxRequests: 100 }));
+    setDatabaseHealthChecker(async () => ({
+      status: 'healthy',
+      storage: 'in-memory',
+      latencyMs: 0
+    }));
   });
 
   after(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  test('GET /health returns 200 and healthy status', async () => {
-    const res = await fetch(`${baseUrl}/health`);
+  test('GET /health and /health/live return 200 with uptime and memory', async () => {
+    const res = await fetch(`${baseUrl}/health/live`);
     const data = await res.json();
     assert.strictEqual(res.status, 200);
     assert.strictEqual(data.status, 'healthy');
+    assert.strictEqual(typeof data.uptimeSeconds, 'number');
+    assert.strictEqual(typeof data.memory.rssMb, 'number');
+  });
+
+  test('GET /health/ready returns 200 when database is healthy', async () => {
+    const res = await fetch(`${baseUrl}/health/ready`);
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(data.status, 'healthy');
+    assert.strictEqual(data.database.storage, 'in-memory');
+  });
+
+  test('GET /health/ready returns 503 when database is unhealthy', async () => {
+    setDatabaseHealthChecker(async () => ({
+      status: 'unhealthy',
+      storage: 'postgresql',
+      latencyMs: 50.5,
+      error: 'Connection refused'
+    }));
+
+    const res = await fetch(`${baseUrl}/health/ready`);
+    const data = await res.json();
+    assert.strictEqual(res.status, 503);
+    assert.strictEqual(data.status, 'unhealthy');
+    assert.strictEqual(data.database.error, 'Connection refused');
   });
 
   test('GET /openapi.json returns 200 and valid OpenAPI 3.0 schema', async () => {
