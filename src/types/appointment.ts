@@ -30,3 +30,21 @@ export interface ServiceResult<T> {
   error?: string;
   errorType?: ServiceErrorType;
 }
+
+export interface AppointmentQueryFilter {
+  date?: string | undefined;
+  startDate?: string | undefined;
+  endDate?: string | undefined;
+  status?: AppointmentStatus | undefined;
+  customer?: string | undefined;
+  page?: number | undefined;
+  limit?: number | undefined;
+}
+
+export interface PaginatedAppointmentsResult {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  data: Appointment[];
+}

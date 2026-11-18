@@ -56,8 +56,52 @@ export const openApiSpec = {
     '/appointments': {
       get: {
         tags: ['Appointments'],
-        summary: 'List all appointments',
-        description: 'Returns all scheduled appointments sorted chronologically.',
+        summary: 'List all appointments (with filtering & pagination)',
+        description: 'Returns scheduled appointments with optional filtering by date, date range, status, customer, and pagination.',
+        parameters: [
+          {
+            name: 'page',
+            in: 'query',
+            description: 'Page number (starts at 1)',
+            schema: { type: 'integer', default: 1, minimum: 1 }
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            description: 'Maximum number of items per page (max 100)',
+            schema: { type: 'integer', default: 20, minimum: 1, maximum: 100 }
+          },
+          {
+            name: 'date',
+            in: 'query',
+            description: 'Filter by exact date (YYYY-MM-DD)',
+            schema: { type: 'string', format: 'date', example: '2026-11-20' }
+          },
+          {
+            name: 'startDate',
+            in: 'query',
+            description: 'Filter appointments on or after this date (YYYY-MM-DD)',
+            schema: { type: 'string', format: 'date', example: '2026-11-01' }
+          },
+          {
+            name: 'endDate',
+            in: 'query',
+            description: 'Filter appointments on or before this date (YYYY-MM-DD)',
+            schema: { type: 'string', format: 'date', example: '2026-11-30' }
+          },
+          {
+            name: 'status',
+            in: 'query',
+            description: 'Filter by appointment status',
+            schema: { type: 'string', enum: ['CONFIRMED', 'CANCELLED'] }
+          },
+          {
+            name: 'customer',
+            in: 'query',
+            description: 'Case-insensitive filter by customer name',
+            schema: { type: 'string', example: 'Max' }
+          }
+        ],
         responses: {
           '200': {
             description: 'List of appointments successfully retrieved',
@@ -66,13 +110,24 @@ export const openApiSpec = {
                 schema: {
                   type: 'object',
                   properties: {
-                    count: { type: 'integer', example: 1 },
+                    total: { type: 'integer', example: 1 },
+                    page: { type: 'integer', example: 1 },
+                    limit: { type: 'integer', example: 20 },
+                    totalPages: { type: 'integer', example: 1 },
                     data: {
                       type: 'array',
                       items: { $ref: '#/components/schemas/Appointment' }
                     }
                   }
                 }
+              }
+            }
+          },
+          '400': {
+            description: 'Invalid query parameters provided',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
               }
             }
           }

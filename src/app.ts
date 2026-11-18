@@ -1,6 +1,11 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { AppointmentService } from './services/appointmentService.js';
-import { CreateAppointmentDTO, UpdateAppointmentDTO } from './types/appointment.js';
+import {
+  CreateAppointmentDTO,
+  UpdateAppointmentDTO,
+  AppointmentQueryFilter,
+  AppointmentStatus
+} from './types/appointment.js';
 import { openApiSpec, swaggerUiHtml } from './docs/openapi.js';
 
 let currentService = new AppointmentService();
@@ -89,8 +94,27 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
 
     // GET /appointments
     if (method === 'GET' && pathname === '/appointments') {
-      const all = await currentService.getAll();
-      sendJson(res, 200, { count: all.length, data: all });
+      const pageParam = url.searchParams.get('page');
+      const limitParam = url.searchParams.get('limit');
+      const page = pageParam !== null ? Number(pageParam) : undefined;
+      const limit = limitParam !== null ? Number(limitParam) : undefined;
+
+      const filter: AppointmentQueryFilter = {
+        date: url.searchParams.get('date') ?? undefined,
+        startDate: url.searchParams.get('startDate') ?? undefined,
+        endDate: url.searchParams.get('endDate') ?? undefined,
+        status: (url.searchParams.get('status') as AppointmentStatus) ?? undefined,
+        customer: url.searchParams.get('customer') ?? undefined,
+        page,
+        limit
+      };
+
+      const result = await currentService.getAll(filter);
+      if (!result.success) {
+        sendJson(res, 400, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, result.data);
       return;
     }
 

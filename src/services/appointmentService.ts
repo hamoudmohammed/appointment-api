@@ -1,4 +1,11 @@
-import { Appointment, CreateAppointmentDTO, UpdateAppointmentDTO, ServiceResult } from '../types/appointment.js';
+import {
+  Appointment,
+  CreateAppointmentDTO,
+  UpdateAppointmentDTO,
+  ServiceResult,
+  AppointmentQueryFilter,
+  PaginatedAppointmentsResult
+} from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
 import { InMemoryAppointmentRepository } from '../repositories/inMemoryAppointmentRepository.js';
 
@@ -7,8 +14,36 @@ export class AppointmentService {
     private readonly repository: IAppointmentRepository = new InMemoryAppointmentRepository()
   ) {}
 
-  public async getAll(): Promise<Appointment[]> {
-    return this.repository.findAll();
+  public async getAll(filter?: AppointmentQueryFilter): Promise<ServiceResult<PaginatedAppointmentsResult>> {
+    if (filter) {
+      const validationError = this.validateFilter(filter);
+      if (validationError) {
+        return { success: false, error: validationError, errorType: 'VALIDATION_ERROR' };
+      }
+    }
+
+    const page = Math.max(1, filter?.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filter?.limit ?? 20));
+
+    const repoFilter: AppointmentQueryFilter = {
+      ...filter,
+      page,
+      limit
+    };
+
+    const { items, total } = await this.repository.findAll(repoFilter);
+    const totalPages = Math.ceil(total / limit) || (total === 0 ? 0 : 1);
+
+    return {
+      success: true,
+      data: {
+        total,
+        page,
+        limit,
+        totalPages,
+        data: items
+      }
+    };
   }
 
   public async getById(id: number): Promise<Appointment | undefined> {
@@ -184,6 +219,40 @@ export class AppointmentService {
 
     if (dto.status !== undefined && dto.status !== 'CONFIRMED' && dto.status !== 'CANCELLED') {
       return 'Field "status" must be either "CONFIRMED" or "CANCELLED".';
+    }
+
+    return null;
+  }
+
+  private validateFilter(filter: AppointmentQueryFilter): string | null {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (filter.date !== undefined && (!filter.date || !dateRegex.test(filter.date))) {
+      return 'Query parameter "date" must follow YYYY-MM-DD format.';
+    }
+
+    if (filter.startDate !== undefined && (!filter.startDate || !dateRegex.test(filter.startDate))) {
+      return 'Query parameter "startDate" must follow YYYY-MM-DD format.';
+    }
+
+    if (filter.endDate !== undefined && (!filter.endDate || !dateRegex.test(filter.endDate))) {
+      return 'Query parameter "endDate" must follow YYYY-MM-DD format.';
+    }
+
+    if (filter.startDate && filter.endDate && filter.startDate > filter.endDate) {
+      return '"startDate" cannot be after "endDate".';
+    }
+
+    if (filter.status !== undefined && filter.status !== 'CONFIRMED' && filter.status !== 'CANCELLED') {
+      return 'Query parameter "status" must be either "CONFIRMED" or "CANCELLED".';
+    }
+
+    if (filter.page !== undefined && (!Number.isInteger(filter.page) || filter.page < 1)) {
+      return 'Query parameter "page" must be a positive integer greater than or equal to 1.';
+    }
+
+    if (filter.limit !== undefined && (!Number.isInteger(filter.limit) || filter.limit < 1 || filter.limit > 100)) {
+      return 'Query parameter "limit" must be an integer between 1 and 100.';
     }
 
     return null;

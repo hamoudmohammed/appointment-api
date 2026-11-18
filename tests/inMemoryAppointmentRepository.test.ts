@@ -10,9 +10,53 @@ describe('InMemoryAppointmentRepository', () => {
   });
 
   test('findAll() returns all appointments', async () => {
-    const all = await repo.findAll();
-    assert.strictEqual(all.length, 1);
-    assert.strictEqual(all[0].customer, 'Max Mustermann');
+    const res = await repo.findAll();
+    assert.strictEqual(res.total, 1);
+    assert.strictEqual(res.items.length, 1);
+    assert.strictEqual(res.items[0].customer, 'Max Mustermann');
+  });
+
+  test('findAll() filters by date, status, customer, and date range', async () => {
+    await repo.create({
+      customer: 'Alice Wonderland',
+      date: '2026-11-25',
+      time: '14:00',
+      status: 'CONFIRMED'
+    });
+    await repo.create({
+      customer: 'Bob Builder',
+      date: '2026-11-28',
+      time: '09:00',
+      status: 'CANCELLED'
+    });
+
+    // Filter by exact date
+    const byDate = await repo.findAll({ date: '2026-11-25' });
+    assert.strictEqual(byDate.total, 1);
+    assert.strictEqual(byDate.items[0].customer, 'Alice Wonderland');
+
+    // Filter by status
+    const byStatus = await repo.findAll({ status: 'CANCELLED' });
+    assert.strictEqual(byStatus.total, 1);
+    assert.strictEqual(byStatus.items[0].customer, 'Bob Builder');
+
+    // Filter by customer (case-insensitive substring)
+    const byCustomer = await repo.findAll({ customer: 'alice' });
+    assert.strictEqual(byCustomer.total, 1);
+    assert.strictEqual(byCustomer.items[0].customer, 'Alice Wonderland');
+
+    // Filter by date range
+    const byRange = await repo.findAll({ startDate: '2026-11-21', endDate: '2026-11-30' });
+    assert.strictEqual(byRange.total, 2);
+
+    // Pagination
+    const page1 = await repo.findAll({ page: 1, limit: 2 });
+    assert.strictEqual(page1.total, 3);
+    assert.strictEqual(page1.items.length, 2);
+
+    const page2 = await repo.findAll({ page: 2, limit: 2 });
+    assert.strictEqual(page2.total, 3);
+    assert.strictEqual(page2.items.length, 1);
   });
 
   test('findById() finds item by id or returns undefined', async () => {
@@ -51,7 +95,7 @@ describe('InMemoryAppointmentRepository', () => {
     assert.strictEqual(created.customer, 'Alice');
 
     const all = await repo.findAll();
-    assert.strictEqual(all.length, 2);
+    assert.strictEqual(all.total, 2);
   });
 
   test('update() modifies specified fields only', async () => {

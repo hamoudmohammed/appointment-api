@@ -54,12 +54,41 @@ describe('HTTP API Endpoints', () => {
     assert.match(html, /\/openapi\.json/);
   });
 
-  test('GET /appointments returns list with count', async () => {
+  test('GET /appointments returns list with pagination metadata', async () => {
     const res = await fetch(`${baseUrl}/appointments`);
     const data = await res.json();
     assert.strictEqual(res.status, 200);
     assert.ok(Array.isArray(data.data));
-    assert.strictEqual(typeof data.count, 'number');
+    assert.strictEqual(typeof data.total, 'number');
+    assert.strictEqual(data.page, 1);
+    assert.strictEqual(data.limit, 20);
+    assert.strictEqual(typeof data.totalPages, 'number');
+  });
+
+  test('GET /appointments supports filtering and pagination query params', async () => {
+    // Create an appointment for 2026-12-10
+    await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Query Filter User',
+        date: '2026-12-10',
+        time: '15:00'
+      })
+    });
+
+    // Filter by date
+    const dateRes = await fetch(`${baseUrl}/appointments?date=2026-12-10`);
+    const dateData = await dateRes.json();
+    assert.strictEqual(dateRes.status, 200);
+    assert.strictEqual(dateData.total, 1);
+    assert.strictEqual(dateData.data[0].customer, 'Query Filter User');
+
+    // Filter by invalid date returns 400
+    const errRes = await fetch(`${baseUrl}/appointments?date=not-a-date`);
+    const errData = await errRes.json();
+    assert.strictEqual(errRes.status, 400);
+    assert.strictEqual(errData.errorType, 'VALIDATION_ERROR');
   });
 
   test('POST /appointments creates an appointment with 201', async () => {

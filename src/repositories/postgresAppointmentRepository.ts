@@ -1,9 +1,10 @@
 import pg from 'pg';
-import { Appointment, AppointmentStatus } from '../types/appointment.js';
+import { Appointment, AppointmentStatus, AppointmentQueryFilter } from '../types/appointment.js';
 import {
   IAppointmentRepository,
   CreateAppointmentRecord,
-  UpdateAppointmentRecord
+  UpdateAppointmentRecord,
+  RepositoryFindAllResult
 } from './appointmentRepository.js';
 
 interface AppointmentDbRow {
@@ -39,11 +40,56 @@ function mapRowToAppointment(row: AppointmentDbRow): Appointment {
 export class PostgresAppointmentRepository implements IAppointmentRepository {
   constructor(private readonly pool: pg.Pool) {}
 
-  public async findAll(): Promise<Appointment[]> {
-    const res = await this.pool.query<AppointmentDbRow>(
-      'SELECT id, customer, date, time, status, created_at FROM appointments ORDER BY date ASC, time ASC, id ASC'
-    );
-    return res.rows.map(mapRowToAppointment);
+  public async findAll(filter?: AppointmentQueryFilter): Promise<RepositoryFindAllResult> {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (filter?.date) {
+      conditions.push(`date = $${idx++}`);
+      values.push(filter.date);
+    }
+    if (filter?.startDate) {
+      conditions.push(`date >= $${idx++}`);
+      values.push(filter.startDate);
+    }
+    if (filter?.endDate) {
+      conditions.push(`date <= $${idx++}`);
+      values.push(filter.endDate);
+    }
+    if (filter?.status) {
+      conditions.push(`status = $${idx++}`);
+      values.push(filter.status);
+    }
+    if (filter?.customer) {
+      conditions.push(`customer ILIKE $${idx++}`);
+      values.push(`%${filter.customer.trim()}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countSql = `SELECT COUNT(*)::int AS count FROM appointments ${whereClause}`;
+    const countRes = await this.pool.query<{ count: number }>(countSql, values);
+    const total = countRes.rows[0]?.count ?? 0;
+
+    const page = Math.max(1, filter?.page ?? 1);
+    const limit = Math.max(1, filter?.limit ?? 20);
+    const offset = (page - 1) * limit;
+
+    const queryValues = [...values, limit, offset];
+    const dataSql = `
+      SELECT id, customer, date, time, status, created_at
+      FROM appointments
+      ${whereClause}
+      ORDER BY date ASC, time ASC, id ASC
+      LIMIT $${idx++} OFFSET $${idx++}
+    `;
+
+    const res = await this.pool.query<AppointmentDbRow>(dataSql, queryValues);
+    return {
+      items: res.rows.map(mapRowToAppointment),
+      total
+    };
   }
 
   public async findById(id: number): Promise<Appointment | undefined> {

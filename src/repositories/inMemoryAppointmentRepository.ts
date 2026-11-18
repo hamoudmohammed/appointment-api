@@ -1,8 +1,9 @@
-import { Appointment } from '../types/appointment.js';
+import { Appointment, AppointmentQueryFilter } from '../types/appointment.js';
 import {
   IAppointmentRepository,
   CreateAppointmentRecord,
-  UpdateAppointmentRecord
+  UpdateAppointmentRecord,
+  RepositoryFindAllResult
 } from './appointmentRepository.js';
 
 export class InMemoryAppointmentRepository implements IAppointmentRepository {
@@ -28,8 +29,44 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
     }
   }
 
-  public async findAll(): Promise<Appointment[]> {
-    return [...this.appointments];
+  public async findAll(filter?: AppointmentQueryFilter): Promise<RepositoryFindAllResult> {
+    let result = [...this.appointments];
+
+    if (filter) {
+      if (filter.date) {
+        result = result.filter((item) => item.date === filter.date);
+      }
+      if (filter.startDate) {
+        result = result.filter((item) => item.date >= filter.startDate!);
+      }
+      if (filter.endDate) {
+        result = result.filter((item) => item.date <= filter.endDate!);
+      }
+      if (filter.status) {
+        result = result.filter((item) => item.status === filter.status);
+      }
+      if (filter.customer) {
+        const query = filter.customer.trim().toLowerCase();
+        result = result.filter((item) => item.customer.toLowerCase().includes(query));
+      }
+    }
+
+    // Sort consistently: date ASC, time ASC, id ASC
+    result.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      if (a.time !== b.time) return a.time.localeCompare(b.time);
+      return a.id - b.id;
+    });
+
+    const total = result.length;
+
+    const page = Math.max(1, filter?.page ?? 1);
+    const limit = Math.max(1, filter?.limit ?? 20);
+    const offset = (page - 1) * limit;
+
+    const items = result.slice(offset, offset + limit);
+
+    return { items, total };
   }
 
   public async findById(id: number): Promise<Appointment | undefined> {

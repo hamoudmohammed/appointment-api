@@ -11,10 +11,30 @@ describe('AppointmentService', () => {
   });
 
   test('getAll() returns initial seed appointments', async () => {
-    const appointments = await service.getAll();
-    assert.strictEqual(Array.isArray(appointments), true);
-    assert.strictEqual(appointments.length, 1);
-    assert.strictEqual(appointments[0].customer, 'Max Mustermann');
+    const res = await service.getAll();
+    assert.strictEqual(res.success, true);
+    assert.ok(res.data);
+    assert.strictEqual(res.data?.total, 1);
+    assert.strictEqual(res.data?.page, 1);
+    assert.strictEqual(res.data?.data[0].customer, 'Max Mustermann');
+  });
+
+  test('getAll() validates query parameters', async () => {
+    const invalidDate = await service.getAll({ date: 'invalid-date' });
+    assert.strictEqual(invalidDate.success, false);
+    assert.strictEqual(invalidDate.errorType, 'VALIDATION_ERROR');
+
+    const invalidRange = await service.getAll({ startDate: '2026-12-01', endDate: '2026-11-01' });
+    assert.strictEqual(invalidRange.success, false);
+    assert.strictEqual(invalidRange.errorType, 'VALIDATION_ERROR');
+
+    const invalidPage = await service.getAll({ page: 0 });
+    assert.strictEqual(invalidPage.success, false);
+    assert.strictEqual(invalidPage.errorType, 'VALIDATION_ERROR');
+
+    const invalidLimit = await service.getAll({ limit: 101 });
+    assert.strictEqual(invalidLimit.success, false);
+    assert.strictEqual(invalidLimit.errorType, 'VALIDATION_ERROR');
   });
 
   test('getById() returns item when exists and undefined when absent', async () => {
@@ -43,7 +63,7 @@ describe('AppointmentService', () => {
 
     // Verify it is returned in getAll()
     const all = await service.getAll();
-    assert.strictEqual(all.length, 2);
+    assert.strictEqual(all.data?.total, 2);
   });
 
   test('create() prevents double-booking the same date and time slot (CONFLICT)', async () => {
@@ -194,7 +214,7 @@ describe('AppointmentService', () => {
       // Verify it is no longer returned
       assert.strictEqual(await service.getById(1), undefined);
       const all = await service.getAll();
-      assert.strictEqual(all.length, 0);
+      assert.strictEqual(all.data?.total, 0);
     });
 
     test('returns NOT_FOUND when deleting non-existent ID', async () => {
