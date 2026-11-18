@@ -31,6 +31,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
   - Strict payload size limit (1 MB max) to prevent memory exhaustion / DoS attacks.
   - In-memory rate limiting with sliding window (`429 Too Many Requests`, `Retry-After`, `X-RateLimit-*` headers) to safeguard against brute-force attacks.
   - Hardened HTTP security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`) and CORS with `OPTIONS` preflight support.
+  - Observability & Distributed Tracing: Structured JSON logging with request duration (`durationMs`) and request correlation IDs (`X-Request-Id`).
   - Defends against invalid JSON and improper HTTP methods with clean HTTP status codes (`400`, `404`, `409`, `413`, `429`, `500`).
   - Native health check endpoint (`/health`) ready for container orchestrators (Docker, Kubernetes, AWS ECS/ALB).
 

@@ -201,4 +201,22 @@ describe('HTTP API Endpoints', () => {
     const body = await res3.json();
     assert.strictEqual(body.errorType, 'RATE_LIMIT_EXCEEDED');
   });
+
+  test('Response includes generated X-Request-Id header for distributed tracing', async () => {
+    const res = await fetch(`${baseUrl}/health`);
+    assert.strictEqual(res.status, 200);
+    const requestId = res.headers.get('x-request-id');
+    assert.ok(requestId);
+    // UUID v4 format verification
+    assert.match(requestId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
+
+  test('Server preserves client-supplied X-Request-Id header', async () => {
+    const customId = 'gateway-trace-12345';
+    const res = await fetch(`${baseUrl}/health`, {
+      headers: { 'X-Request-Id': customId }
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get('x-request-id'), customId);
+  });
 });

@@ -12,6 +12,7 @@ import {
   getClientIp,
   MemoryRateLimiter
 } from './utils/security.js';
+import { Logger } from './utils/logger.js';
 
 let currentService = new AppointmentService();
 let currentRateLimiter = new MemoryRateLimiter();
@@ -83,8 +84,17 @@ function sendHtml(res: ServerResponse, statusCode: number, html: string): void {
 }
 
 export async function requestHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const startTime = performance.now();
+  const requestId = Logger.getOrCreateRequestId(req);
+
+  // Set correlation ID header on response
+  res.setHeader('X-Request-Id', requestId);
+
   // Apply CORS and hardened security headers to all responses
   applySecurityAndCorsHeaders(res);
+
+  // Log completion when response finishes
+  Logger.logRequest(req, res, requestId, startTime);
 
   // Handle CORS Preflight request immediately
   if (req.method?.toUpperCase() === 'OPTIONS') {
@@ -220,6 +230,13 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
     const statusCode = message === 'Payload Too Large' ? 413 : 500;
+    Logger.error('Unhandled request exception', {
+      requestId,
+      method: req.method?.toUpperCase(),
+      path: req.url,
+      statusCode,
+      error: message
+    });
     sendJson(res, statusCode, { error: message });
   }
 }
