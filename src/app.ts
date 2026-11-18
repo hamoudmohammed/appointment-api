@@ -7,8 +7,14 @@ import {
   AppointmentStatus
 } from './types/appointment.js';
 import { openApiSpec, swaggerUiHtml } from './docs/openapi.js';
+import {
+  applySecurityAndCorsHeaders,
+  getClientIp,
+  MemoryRateLimiter
+} from './utils/security.js';
 
 let currentService = new AppointmentService();
+let currentRateLimiter = new MemoryRateLimiter();
 
 export function setAppointmentService(service: AppointmentService): void {
   currentService = service;
@@ -16,6 +22,14 @@ export function setAppointmentService(service: AppointmentService): void {
 
 export function getAppointmentService(): AppointmentService {
   return currentService;
+}
+
+export function setRateLimiter(limiter: MemoryRateLimiter): void {
+  currentRateLimiter = limiter;
+}
+
+export function getRateLimiter(): MemoryRateLimiter {
+  return currentRateLimiter;
 }
 
 // Maximum allowed payload size: 1 MB
@@ -69,14 +83,41 @@ function sendHtml(res: ServerResponse, statusCode: number, html: string): void {
 }
 
 export async function requestHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  // Apply CORS and hardened security headers to all responses
+  applySecurityAndCorsHeaders(res);
+
+  // Handle CORS Preflight request immediately
+  if (req.method?.toUpperCase() === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   try {
     const url = new URL(req.url ?? '/', `http://${req.headers.host || 'localhost'}`);
     const { pathname } = url;
     const method = req.method?.toUpperCase();
 
-    // Health check endpoint (vital for Docker, Kubernetes, AWS ALB)
+    // Health check endpoint (exempt from rate limiting, vital for Docker, Kubernetes, AWS ALB)
     if (method === 'GET' && pathname === '/health') {
       sendJson(res, 200, { status: 'healthy', timestamp: new Date().toISOString() });
+      return;
+    }
+
+    // Rate Limiting check
+    const clientIp = getClientIp(req);
+    const rateCheck = currentRateLimiter.check(clientIp);
+    res.setHeader('X-RateLimit-Limit', '100');
+    res.setHeader('X-RateLimit-Remaining', rateCheck.remaining.toString());
+    res.setHeader('X-RateLimit-Reset', new Date(rateCheck.resetTime).toISOString());
+
+    if (!rateCheck.allowed) {
+      res.setHeader('Retry-After', rateCheck.retryAfterSeconds.toString());
+      sendJson(res, 429, {
+        error: 'Too many requests. Please try again later.',
+        errorType: 'RATE_LIMIT_EXCEEDED',
+        retryAfterSeconds: rateCheck.retryAfterSeconds
+      });
       return;
     }
 

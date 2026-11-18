@@ -1,9 +1,10 @@
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { requestHandler, setAppointmentService } from '../src/app.js';
+import { requestHandler, setAppointmentService, setRateLimiter } from '../src/app.js';
 import { AppointmentService } from '../src/services/appointmentService.js';
 import { InMemoryAppointmentRepository } from '../src/repositories/inMemoryAppointmentRepository.js';
+import { MemoryRateLimiter } from '../src/utils/security.js';
 
 describe('HTTP API Endpoints', () => {
   let server: http.Server;
@@ -22,6 +23,7 @@ describe('HTTP API Endpoints', () => {
 
   beforeEach(() => {
     setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
+    setRateLimiter(new MemoryRateLimiter({ windowMs: 60000, maxRequests: 100 }));
   });
 
   after(async () => {
@@ -161,5 +163,42 @@ describe('HTTP API Endpoints', () => {
       method: 'DELETE'
     });
     assert.strictEqual(res.status, 404);
+  });
+
+  test('Security & CORS headers are present on responses', async () => {
+    const res = await fetch(`${baseUrl}/health`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get('access-control-allow-origin'), '*');
+    assert.strictEqual(res.headers.get('x-frame-options'), 'DENY');
+    assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
+  });
+
+  test('OPTIONS preflight returns 204 No Content with CORS headers', async () => {
+    const res = await fetch(`${baseUrl}/appointments`, {
+      method: 'OPTIONS'
+    });
+    assert.strictEqual(res.status, 204);
+    assert.strictEqual(res.headers.get('access-control-allow-origin'), '*');
+    assert.ok(res.headers.get('access-control-allow-methods')?.includes('POST'));
+  });
+
+  test('Rate limiting blocks excessive requests with 429 Too Many Requests', async () => {
+    // Configure rate limiter with max 2 requests
+    setRateLimiter(new MemoryRateLimiter({ windowMs: 60000, maxRequests: 2 }));
+
+    const res1 = await fetch(`${baseUrl}/appointments`);
+    assert.strictEqual(res1.status, 200);
+    assert.strictEqual(res1.headers.get('x-ratelimit-remaining'), '1');
+
+    const res2 = await fetch(`${baseUrl}/appointments`);
+    assert.strictEqual(res2.status, 200);
+    assert.strictEqual(res2.headers.get('x-ratelimit-remaining'), '0');
+
+    // 3rd request should exceed limit
+    const res3 = await fetch(`${baseUrl}/appointments`);
+    assert.strictEqual(res3.status, 429);
+    assert.ok(res3.headers.get('retry-after'));
+    const body = await res3.json();
+    assert.strictEqual(body.errorType, 'RATE_LIMIT_EXCEEDED');
   });
 });
