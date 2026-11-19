@@ -115,6 +115,26 @@ export const openApiSpec = {
         }
       }
     },
+    '/metrics': {
+      get: {
+        tags: ['System'],
+        summary: 'Prometheus metrics endpoint',
+        description: 'Exposes application and runtime metrics in Prometheus text-based exposition format for cloud observability.',
+        responses: {
+          '200': {
+            description: 'Prometheus metrics in OpenMetrics text format',
+            content: {
+              'text/plain': {
+                schema: {
+                  type: 'string',
+                  example: '# HELP http_requests_total Total number of HTTP requests processed.\n# TYPE http_requests_total counter\nhttp_requests_total{method="GET",path="/appointments",status="200"} 42\n'
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     '/appointments': {
       get: {
         tags: ['Appointments'],

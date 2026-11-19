@@ -72,6 +72,20 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.database.error, 'Connection refused');
   });
 
+  test('GET /metrics returns 200 with Prometheus formatted metrics', async () => {
+    // Perform a request first to produce metrics
+    await fetch(`${baseUrl}/health/live`);
+
+    const res = await fetch(`${baseUrl}/metrics`);
+    const text = await res.text();
+    assert.strictEqual(res.status, 200);
+    assert.match(res.headers.get('content-type') || '', /text\/plain/);
+    assert.match(text, /# HELP http_requests_total/);
+    assert.match(text, /# TYPE http_requests_total counter/);
+    assert.match(text, /nodejs_process_uptime_seconds/);
+    assert.match(text, /nodejs_process_heap_bytes/);
+  });
+
   test('GET /openapi.json returns 200 and valid OpenAPI 3.0 schema', async () => {
     const res = await fetch(`${baseUrl}/openapi.json`);
     const data = await res.json();
@@ -81,6 +95,7 @@ describe('HTTP API Endpoints', () => {
     assert.ok(data.paths['/appointments']);
     assert.ok(data.paths['/appointments/slots']);
     assert.ok(data.paths['/appointments/{id}']);
+    assert.ok(data.paths['/metrics']);
     assert.ok(data.components.securitySchemes.ApiKeyAuth);
   });
 

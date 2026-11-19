@@ -32,7 +32,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
   - In-memory rate limiting with sliding window (`429 Too Many Requests`, `Retry-After`, `X-RateLimit-*` headers) to safeguard against brute-force attacks.
   - API Key Authentication: Destructive administrative operations (such as `DELETE /appointments/:id`) are guarded via `X-API-Key` or `Authorization: Bearer <key>` headers (`401 Unauthorized`).
   - Hardened HTTP security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`) and CORS with `OPTIONS` preflight support.
-  - Observability & Distributed Tracing: Structured JSON logging with request duration (`durationMs`) and request correlation IDs (`X-Request-Id`).
+  - Observability & Distributed Tracing: Structured JSON logging with request duration (`durationMs`), correlation IDs (`X-Request-Id`), and native Prometheus metrics (`/metrics`) for Grafana scraping.
   - Defends against invalid JSON and improper HTTP methods with clean HTTP status codes (`400`, `404`, `409`, `413`, `429`, `500`).
   - Native health check endpoint (`/health`) ready for container orchestrators (Docker, Kubernetes, AWS ECS/ALB).
 
@@ -46,6 +46,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/openapi.json` | OpenAPI 3.0.3 specification schema | `200` |
 | `GET` | `/health` / `/health/live` | Liveness probe (uptime & memory metrics) | `200` |
 | `GET` | `/health/ready` | Database readiness probe (active ping & pool statistics) | `200`, `503` |
+| `GET` | `/metrics` | Prometheus metrics for cloud monitoring and Grafana scraping | `200` |
 | `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`) | `200`, `400` |
 | `GET` | `/appointments/slots` | Discover available and booked time slots for a given date | `200`, `400` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |

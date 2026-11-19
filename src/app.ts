@@ -15,6 +15,7 @@ import {
 import { Logger } from './utils/logger.js';
 import { DatabaseHealthStatus } from './db/pool.js';
 import { validateApiKey } from './utils/auth.js';
+import { globalMetrics } from './utils/metrics.js';
 
 export type DatabaseHealthChecker = () => Promise<DatabaseHealthStatus>;
 
@@ -122,6 +123,9 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
   // Log completion when response finishes
   Logger.logRequest(req, res, requestId, startTime);
 
+  // Track request metrics for Prometheus
+  globalMetrics.attachToResponse(req, res);
+
   // Handle CORS Preflight request immediately
   if (req.method?.toUpperCase() === 'OPTIONS') {
     res.writeHead(204);
@@ -158,6 +162,16 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         timestamp: new Date().toISOString(),
         database: dbStatus
       });
+      return;
+    }
+
+    // Prometheus Metrics endpoint (for scraping by Prometheus / Grafana)
+    if (method === 'GET' && pathname === '/metrics') {
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      res.end(globalMetrics.getPrometheusMetrics());
       return;
     }
 
