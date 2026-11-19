@@ -22,7 +22,7 @@ export interface UpdateAppointmentDTO {
   status?: AppointmentStatus;
 }
 
-export type ServiceErrorType = 'VALIDATION_ERROR' | 'CONFLICT' | 'NOT_FOUND';
+export type ServiceErrorType = 'VALIDATION_ERROR' | 'CONFLICT' | 'NOT_FOUND' | 'UNAUTHORIZED';
 
 export interface ServiceResult<T> {
   success: boolean;

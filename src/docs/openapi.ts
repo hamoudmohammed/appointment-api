@@ -416,8 +416,9 @@ export const openApiSpec = {
       },
       delete: {
         tags: ['Appointments'],
-        summary: 'Delete appointment',
-        description: 'Removes an appointment permanently and frees its time slot.',
+        summary: 'Delete appointment (Admin protected)',
+        description: 'Removes an appointment permanently and frees its time slot. Requires valid X-API-Key header.',
+        security: [{ ApiKeyAuth: [] }],
         parameters: [
           {
             name: 'id',
@@ -442,6 +443,14 @@ export const openApiSpec = {
               }
             }
           },
+          '401': {
+            description: 'Unauthorized - Missing or invalid API key',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
           '404': {
             description: 'Appointment not found',
             content: {
@@ -455,6 +464,14 @@ export const openApiSpec = {
     }
   },
   components: {
+    securitySchemes: {
+      ApiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-API-Key',
+        description: 'Administrative API key required for destructive operations such as DELETE /appointments/:id'
+      }
+    },
     schemas: {
       Appointment: {
         type: 'object',

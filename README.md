@@ -30,6 +30,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
     Cancelled appointments automatically liberate the time slot.
   - Strict payload size limit (1 MB max) to prevent memory exhaustion / DoS attacks.
   - In-memory rate limiting with sliding window (`429 Too Many Requests`, `Retry-After`, `X-RateLimit-*` headers) to safeguard against brute-force attacks.
+  - API Key Authentication: Destructive administrative operations (such as `DELETE /appointments/:id`) are guarded via `X-API-Key` or `Authorization: Bearer <key>` headers (`401 Unauthorized`).
   - Hardened HTTP security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`) and CORS with `OPTIONS` preflight support.
   - Observability & Distributed Tracing: Structured JSON logging with request duration (`durationMs`) and request correlation IDs (`X-Request-Id`).
   - Defends against invalid JSON and improper HTTP methods with clean HTTP status codes (`400`, `404`, `409`, `413`, `429`, `500`).
@@ -50,7 +51,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
 | `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |
 | `PATCH` | `/appointments/:id` | Update customer, reschedule date/time, or cancel status | `200`, `400`, `404`, `409` |
-| `DELETE` | `/appointments/:id` | Remove an appointment and free its time slot | `200`, `404` |
+| `DELETE` | `/appointments/:id` | Remove an appointment (Admin protected via `X-API-Key`) | `200`, `401`, `404` |
 
 ---
 

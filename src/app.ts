@@ -14,16 +14,26 @@ import {
 } from './utils/security.js';
 import { Logger } from './utils/logger.js';
 import { DatabaseHealthStatus } from './db/pool.js';
+import { validateApiKey } from './utils/auth.js';
 
 export type DatabaseHealthChecker = () => Promise<DatabaseHealthStatus>;
 
 let currentService = new AppointmentService();
 let currentRateLimiter = new MemoryRateLimiter();
+let currentAdminApiKey = process.env.ADMIN_API_KEY || 'admin-secret-key-123';
 let currentDbHealthChecker: DatabaseHealthChecker = async () => ({
   status: 'healthy',
   storage: 'in-memory',
   latencyMs: 0
 });
+
+export function setAdminApiKey(key: string): void {
+  currentAdminApiKey = key;
+}
+
+export function getAdminApiKey(): string {
+  return currentAdminApiKey;
+}
 
 export function setAppointmentService(service: AppointmentService): void {
   currentService = service;
@@ -249,8 +259,14 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
-    // DELETE /appointments/:id
+    // DELETE /appointments/:id (Protected by API Key Authentication)
     if (method === 'DELETE' && singleMatch) {
+      const auth = validateApiKey(req, currentAdminApiKey);
+      if (!auth.authenticated) {
+        sendJson(res, 401, { error: auth.error, errorType: 'UNAUTHORIZED' });
+        return;
+      }
+
       const id = parseInt(singleMatch[1], 10);
       const result = await currentService.delete(id);
       if (!result.success) {

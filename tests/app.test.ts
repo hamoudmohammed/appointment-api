@@ -81,6 +81,7 @@ describe('HTTP API Endpoints', () => {
     assert.ok(data.paths['/appointments']);
     assert.ok(data.paths['/appointments/slots']);
     assert.ok(data.paths['/appointments/{id}']);
+    assert.ok(data.components.securitySchemes.ApiKeyAuth);
   });
 
   test('GET /docs returns 200 and HTML with Swagger UI', async () => {
@@ -184,7 +185,26 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.errorType, 'NOT_FOUND');
   });
 
-  test('DELETE /appointments/:id deletes an appointment with 200', async () => {
+  test('DELETE /appointments/:id requires valid API key (401 Unauthorized)', async () => {
+    // Attempt deletion without auth header
+    const noAuthRes = await fetch(`${baseUrl}/appointments/1`, {
+      method: 'DELETE'
+    });
+    const noAuthData = await noAuthRes.json();
+    assert.strictEqual(noAuthRes.status, 401);
+    assert.strictEqual(noAuthData.errorType, 'UNAUTHORIZED');
+
+    // Attempt deletion with invalid key
+    const badAuthRes = await fetch(`${baseUrl}/appointments/1`, {
+      method: 'DELETE',
+      headers: { 'X-API-Key': 'wrong-key' }
+    });
+    const badAuthData = await badAuthRes.json();
+    assert.strictEqual(badAuthRes.status, 401);
+    assert.strictEqual(badAuthData.errorType, 'UNAUTHORIZED');
+  });
+
+  test('DELETE /appointments/:id deletes an appointment with 200 when valid API key is supplied', async () => {
     // Create an item to delete
     const postRes = await fetch(`${baseUrl}/appointments`, {
       method: 'POST',
@@ -198,9 +218,10 @@ describe('HTTP API Endpoints', () => {
     const created = await postRes.json();
     const idToDelete = created.data.id;
 
-    // Delete it
+    // Delete it with valid X-API-Key
     const delRes = await fetch(`${baseUrl}/appointments/${idToDelete}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { 'X-API-Key': 'admin-secret-key-123' }
     });
     const delData = await delRes.json();
     assert.strictEqual(delRes.status, 200);
@@ -211,9 +232,10 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(getRes.status, 404);
   });
 
-  test('DELETE /appointments/:id returns 404 for unknown id', async () => {
+  test('DELETE /appointments/:id returns 404 for unknown id when authenticated', async () => {
     const res = await fetch(`${baseUrl}/appointments/8888`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { 'X-API-Key': 'admin-secret-key-123' }
     });
     assert.strictEqual(res.status, 404);
   });
