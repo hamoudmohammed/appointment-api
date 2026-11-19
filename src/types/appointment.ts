@@ -48,3 +48,22 @@ export interface PaginatedAppointmentsResult {
   totalPages: number;
   data: Appointment[];
 }
+
+export interface SlotInfo {
+  time: string;
+  available: boolean;
+}
+
+export interface AvailableSlotsResult {
+  date: string;
+  businessHours: {
+    start: string;
+    end: string;
+    slotDurationMinutes: number;
+  };
+  totalSlots: number;
+  availableCount: number;
+  bookedCount: number;
+  availableSlots: string[];
+  slots: SlotInfo[];
+}

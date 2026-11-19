@@ -249,6 +249,71 @@ export const openApiSpec = {
         }
       }
     },
+    '/appointments/slots': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'Get available booking slots for a given date',
+        description: 'Calculates all available and booked time slots based on business hours (08:00 - 17:00, 30 min intervals), excluding already confirmed appointments.',
+        parameters: [
+          {
+            name: 'date',
+            in: 'query',
+            required: true,
+            description: 'Date to inspect for available slots (YYYY-MM-DD)',
+            schema: { type: 'string', format: 'date', example: '2026-11-20' }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Available slots breakdown for the specified date',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    date: { type: 'string', example: '2026-11-20' },
+                    businessHours: {
+                      type: 'object',
+                      properties: {
+                        start: { type: 'string', example: '08:00' },
+                        end: { type: 'string', example: '17:00' },
+                        slotDurationMinutes: { type: 'integer', example: 30 }
+                      }
+                    },
+                    totalSlots: { type: 'integer', example: 18 },
+                    availableCount: { type: 'integer', example: 17 },
+                    bookedCount: { type: 'integer', example: 1 },
+                    availableSlots: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      example: ['08:00', '08:30', '09:00', '09:30', '10:30']
+                    },
+                    slots: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          time: { type: 'string', example: '10:00' },
+                          available: { type: 'boolean', example: false }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Validation Error (missing or invalid date format)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
     '/appointments/{id}': {
       get: {
         tags: ['Appointments'],

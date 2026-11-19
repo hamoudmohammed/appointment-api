@@ -235,4 +235,43 @@ describe('AppointmentService', () => {
       assert.strictEqual(rebook.success, true);
     });
   });
+
+  describe('getAvailableSlots()', () => {
+    test('returns VALIDATION_ERROR when date is missing or invalid', async () => {
+      const missing = await service.getAvailableSlots(undefined);
+      assert.strictEqual(missing.success, false);
+      assert.strictEqual(missing.errorType, 'VALIDATION_ERROR');
+
+      const invalid = await service.getAvailableSlots('20-11-2026');
+      assert.strictEqual(invalid.success, false);
+      assert.strictEqual(invalid.errorType, 'VALIDATION_ERROR');
+    });
+
+    test('returns correct slot availability for a date with confirmed bookings', async () => {
+      const res = await service.getAvailableSlots('2026-11-20');
+      assert.strictEqual(res.success, true);
+      assert.ok(res.data);
+      assert.strictEqual(res.data?.date, '2026-11-20');
+      assert.strictEqual(res.data?.totalSlots, 18);
+      assert.strictEqual(res.data?.availableCount, 17);
+      assert.strictEqual(res.data?.bookedCount, 1);
+      assert.strictEqual(res.data?.availableSlots.includes('10:00'), false);
+      assert.strictEqual(res.data?.availableSlots.includes('08:00'), true);
+
+      const tenAmSlot = res.data?.slots.find((s) => s.time === '10:00');
+      assert.strictEqual(tenAmSlot?.available, false);
+
+      const eightAmSlot = res.data?.slots.find((s) => s.time === '08:00');
+      assert.strictEqual(eightAmSlot?.available, true);
+    });
+
+    test('cancelled appointments do not consume slots', async () => {
+      await service.update(1, { status: 'CANCELLED' });
+      const res = await service.getAvailableSlots('2026-11-20');
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data?.availableCount, 18);
+      assert.strictEqual(res.data?.bookedCount, 0);
+      assert.strictEqual(res.data?.availableSlots.includes('10:00'), true);
+    });
+  });
 });

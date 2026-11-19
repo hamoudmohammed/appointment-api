@@ -206,6 +206,18 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
+    // GET /appointments/slots
+    if (method === 'GET' && pathname === '/appointments/slots') {
+      const dateParam = url.searchParams.get('date') ?? undefined;
+      const result = await currentService.getAvailableSlots(dateParam);
+      if (!result.success) {
+        sendJson(res, 400, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, result.data);
+      return;
+    }
+
     // Single appointment routes (/appointments/:id)
     const singleMatch = pathname.match(/^\/appointments\/(\d+)$/);
 

@@ -79,6 +79,7 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.openapi, '3.0.3');
     assert.strictEqual(data.info.title, 'Appointment REST API');
     assert.ok(data.paths['/appointments']);
+    assert.ok(data.paths['/appointments/slots']);
     assert.ok(data.paths['/appointments/{id}']);
   });
 
@@ -100,6 +101,23 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.page, 1);
     assert.strictEqual(data.limit, 20);
     assert.strictEqual(typeof data.totalPages, 'number');
+  });
+
+  test('GET /appointments/slots returns available slot breakdown', async () => {
+    // Missing date query param
+    const badRes = await fetch(`${baseUrl}/appointments/slots`);
+    assert.strictEqual(badRes.status, 400);
+
+    // Valid date query param
+    const res = await fetch(`${baseUrl}/appointments/slots?date=2026-11-20`);
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.date, '2026-11-20');
+    assert.strictEqual(data.totalSlots, 18);
+    assert.strictEqual(data.availableCount, 17);
+    assert.strictEqual(data.bookedCount, 1);
+    assert.strictEqual(data.availableSlots.includes('10:00'), false);
+    assert.strictEqual(data.availableSlots.includes('14:00'), true);
   });
 
   test('GET /appointments supports filtering and pagination query params', async () => {

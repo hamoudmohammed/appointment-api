@@ -46,6 +46,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/health` / `/health/live` | Liveness probe (uptime & memory metrics) | `200` |
 | `GET` | `/health/ready` | Database readiness probe (active ping & pool statistics) | `200`, `503` |
 | `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`) | `200`, `400` |
+| `GET` | `/appointments/slots` | Discover available and booked time slots for a given date | `200`, `400` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
 | `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |
 | `PATCH` | `/appointments/:id` | Update customer, reschedule date/time, or cancel status | `200`, `400`, `404`, `409` |

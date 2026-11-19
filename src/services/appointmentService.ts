@@ -4,7 +4,9 @@ import {
   UpdateAppointmentDTO,
   ServiceResult,
   AppointmentQueryFilter,
-  PaginatedAppointmentsResult
+  PaginatedAppointmentsResult,
+  AvailableSlotsResult,
+  SlotInfo
 } from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
 import { InMemoryAppointmentRepository } from '../repositories/inMemoryAppointmentRepository.js';
@@ -48,6 +50,80 @@ export class AppointmentService {
 
   public async getById(id: number): Promise<Appointment | undefined> {
     return this.repository.findById(id);
+  }
+
+  public static readonly BUSINESS_HOURS = {
+    start: '08:00',
+    end: '17:00',
+    slotDurationMinutes: 30
+  };
+
+  private generateDailySlots(): string[] {
+    const slots: string[] = [];
+    const [startH, startM] = AppointmentService.BUSINESS_HOURS.start.split(':').map(Number);
+    const [endH, endM] = AppointmentService.BUSINESS_HOURS.end.split(':').map(Number);
+
+    let currentMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    while (currentMinutes < endMinutes) {
+      const h = Math.floor(currentMinutes / 60).toString().padStart(2, '0');
+      const m = (currentMinutes % 60).toString().padStart(2, '0');
+      slots.push(`${h}:${m}`);
+      currentMinutes += AppointmentService.BUSINESS_HOURS.slotDurationMinutes;
+    }
+    return slots;
+  }
+
+  public async getAvailableSlots(date?: string): Promise<ServiceResult<AvailableSlotsResult>> {
+    if (!date) {
+      return {
+        success: false,
+        error: 'Query parameter "date" is required (YYYY-MM-DD format).',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      return {
+        success: false,
+        error: 'Query parameter "date" must follow YYYY-MM-DD format.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const { items } = await this.repository.findAll({
+      date,
+      status: 'CONFIRMED',
+      limit: 100
+    });
+
+    const bookedSet = new Set(items.map((item) => item.time));
+    const allSlots = this.generateDailySlots();
+
+    const slots: SlotInfo[] = allSlots.map((time) => ({
+      time,
+      available: !bookedSet.has(time)
+    }));
+
+    const availableSlots = slots.filter((s) => s.available).map((s) => s.time);
+    const totalSlots = slots.length;
+    const availableCount = availableSlots.length;
+    const bookedCount = totalSlots - availableCount;
+
+    return {
+      success: true,
+      data: {
+        date,
+        businessHours: AppointmentService.BUSINESS_HOURS,
+        totalSlots,
+        availableCount,
+        bookedCount,
+        availableSlots,
+        slots
+      }
+    };
   }
 
   public async create(dto: CreateAppointmentDTO): Promise<ServiceResult<Appointment>> {
