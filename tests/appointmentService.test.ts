@@ -248,6 +248,43 @@ describe('AppointmentService', () => {
       assert.strictEqual(newBooking.success, true);
       assert.strictEqual(newBooking.data?.customer, 'New Booker');
     });
+
+    test('prevents modifying an already cancelled appointment', async () => {
+      await service.update(1, { status: 'CANCELLED' });
+      const attempt = await service.update(1, { customer: 'New Name' });
+      assert.strictEqual(attempt.success, false);
+      assert.strictEqual(attempt.errorType, 'VALIDATION_ERROR');
+      assert.match(attempt.error || '', /cancelled/i);
+    });
+
+    test('prevents modifying an already completed appointment', async () => {
+      await service.update(1, { status: 'COMPLETED' });
+      const attempt = await service.update(1, { time: '11:00' });
+      assert.strictEqual(attempt.success, false);
+      assert.strictEqual(attempt.errorType, 'VALIDATION_ERROR');
+      assert.match(attempt.error || '', /completed/i);
+    });
+  });
+
+  describe('cancelAppointment() & completeAppointment()', () => {
+    test('cancelAppointment() cancels confirmed appointment', async () => {
+      const res = await service.cancelAppointment(1);
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data?.status, 'CANCELLED');
+    });
+
+    test('completeAppointment() marks confirmed appointment as completed', async () => {
+      const res = await service.completeAppointment(1);
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data?.status, 'COMPLETED');
+    });
+
+    test('cannot complete a cancelled appointment', async () => {
+      await service.cancelAppointment(1);
+      const res = await service.completeAppointment(1);
+      assert.strictEqual(res.success, false);
+      assert.strictEqual(res.errorType, 'VALIDATION_ERROR');
+    });
   });
 
   describe('delete()', () => {

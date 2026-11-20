@@ -1,5 +1,6 @@
 import {
   Appointment,
+  AppointmentStatus,
   CreateAppointmentDTO,
   UpdateAppointmentDTO,
   ServiceResult,
@@ -178,6 +179,31 @@ export class AppointmentService {
       };
     }
 
+    // Lifecycle state machine guards
+    if (current.status === 'CANCELLED') {
+      return {
+        success: false,
+        error: 'Cannot modify a cancelled appointment. Please book a new appointment.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (current.status === 'COMPLETED') {
+      return {
+        success: false,
+        error: 'Cannot modify an already completed appointment.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (current.status === 'NO_SHOW') {
+      return {
+        success: false,
+        error: 'Cannot modify a no-show appointment.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
     // Validation
     const validationError = this.validateUpdateDTO(dto);
     if (validationError) {
@@ -246,6 +272,66 @@ export class AppointmentService {
 
     return { success: true, data: deleted };
   }
+
+  public async cancelAppointment(id: number): Promise<ServiceResult<Appointment>> {
+    const current = await this.repository.findById(id);
+    if (!current) {
+      return {
+        success: false,
+        error: `Appointment with ID ${id} not found.`,
+        errorType: 'NOT_FOUND'
+      };
+    }
+
+    if (current.status === 'CANCELLED') {
+      return { success: true, data: current };
+    }
+
+    if (current.status === 'COMPLETED') {
+      return {
+        success: false,
+        error: 'Cannot cancel a completed appointment.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const updated = await this.repository.update(id, { status: 'CANCELLED' });
+    return { success: true, data: updated! };
+  }
+
+  public async completeAppointment(id: number): Promise<ServiceResult<Appointment>> {
+    const current = await this.repository.findById(id);
+    if (!current) {
+      return {
+        success: false,
+        error: `Appointment with ID ${id} not found.`,
+        errorType: 'NOT_FOUND'
+      };
+    }
+
+    if (current.status === 'CANCELLED') {
+      return {
+        success: false,
+        error: 'Cannot mark a cancelled appointment as completed.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (current.status === 'COMPLETED') {
+      return { success: true, data: current };
+    }
+
+    const updated = await this.repository.update(id, { status: 'COMPLETED' });
+    return { success: true, data: updated! };
+  }
+
+  private static readonly ALLOWED_STATUSES: AppointmentStatus[] = [
+    'PENDING',
+    'CONFIRMED',
+    'COMPLETED',
+    'CANCELLED',
+    'NO_SHOW'
+  ];
 
   private static readonly ALLOWED_SERVICE_TYPES = [
     'CONSULTATION',
@@ -350,8 +436,8 @@ export class AppointmentService {
       return 'Field "time" must follow HH:mm (24h) format.';
     }
 
-    if (dto.status !== undefined && dto.status !== 'CONFIRMED' && dto.status !== 'CANCELLED') {
-      return 'Field "status" must be either "CONFIRMED" or "CANCELLED".';
+    if (dto.status !== undefined && !AppointmentService.ALLOWED_STATUSES.includes(dto.status)) {
+      return `Field "status" must be one of: ${AppointmentService.ALLOWED_STATUSES.join(', ')}.`;
     }
 
     return null;
@@ -376,8 +462,8 @@ export class AppointmentService {
       return '"startDate" cannot be after "endDate".';
     }
 
-    if (filter.status !== undefined && filter.status !== 'CONFIRMED' && filter.status !== 'CANCELLED') {
-      return 'Query parameter "status" must be either "CONFIRMED" or "CANCELLED".';
+    if (filter.status !== undefined && !AppointmentService.ALLOWED_STATUSES.includes(filter.status)) {
+      return `Query parameter "status" must be one of: ${AppointmentService.ALLOWED_STATUSES.join(', ')}.`;
     }
 
     if (filter.serviceType !== undefined) {

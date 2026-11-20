@@ -1,4 +1,9 @@
-export type AppointmentStatus = 'CONFIRMED' | 'CANCELLED';
+export type AppointmentStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'NO_SHOW';
 
 export type AppointmentServiceType =
   | 'CONSULTATION'

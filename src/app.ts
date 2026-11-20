@@ -245,6 +245,33 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
+    // Quick action routes (/appointments/:id/cancel, /appointments/:id/complete)
+    const cancelMatch = pathname.match(/^\/appointments\/(\d+)\/cancel$/);
+    if (method === 'POST' && cancelMatch) {
+      const id = parseInt(cancelMatch[1], 10);
+      const result = await currentService.cancelAppointment(id);
+      if (!result.success) {
+        const statusCode = result.errorType === 'NOT_FOUND' ? 404 : 400;
+        sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, { message: 'Appointment cancelled successfully', data: result.data });
+      return;
+    }
+
+    const completeMatch = pathname.match(/^\/appointments\/(\d+)\/complete$/);
+    if (method === 'POST' && completeMatch) {
+      const id = parseInt(completeMatch[1], 10);
+      const result = await currentService.completeAppointment(id);
+      if (!result.success) {
+        const statusCode = result.errorType === 'NOT_FOUND' ? 404 : 400;
+        sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, { message: 'Appointment marked as completed successfully', data: result.data });
+      return;
+    }
+
     // Single appointment routes (/appointments/:id)
     const singleMatch = pathname.match(/^\/appointments\/(\d+)$/);
 

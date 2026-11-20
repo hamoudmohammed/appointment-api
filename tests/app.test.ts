@@ -200,6 +200,26 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.errorType, 'NOT_FOUND');
   });
 
+  test('POST /appointments/:id/cancel cancels an appointment with 200', async () => {
+    const res = await fetch(`${baseUrl}/appointments/1/cancel`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(data.data.status, 'CANCELLED');
+    assert.match(data.message, /cancelled successfully/i);
+  });
+
+  test('POST /appointments/:id/complete marks appointment completed with 200', async () => {
+    const res = await fetch(`${baseUrl}/appointments/1/complete`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(data.data.status, 'COMPLETED');
+    assert.match(data.message, /completed successfully/i);
+  });
+
   test('DELETE /appointments/:id requires valid API key (401 Unauthorized)', async () => {
     // Attempt deletion without auth header
     const noAuthRes = await fetch(`${baseUrl}/appointments/1`, {
