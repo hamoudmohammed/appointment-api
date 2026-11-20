@@ -16,9 +16,11 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 ## Architecture & Design Decisions
 
 - **Separation of Concerns & Repository Pattern:** 
-  - `types/`: Strict TypeScript data models and DTOs (Data Transfer Objects).
+  - `types/`: Strict TypeScript data models, DTOs (Data Transfer Objects), and lifecycle domain state types.
   - `repositories/`: Abstract `IAppointmentRepository` interface with `PostgresAppointmentRepository` for production/cloud environments (e.g., AWS RDS) and `InMemoryAppointmentRepository` for blazing-fast, isolated automated testing.
-  - `services/`: Encapsulated domain business logic, input validation, and conflict detection decoupled from HTTP layers and database drivers.
+  - `services/`: Encapsulated domain business logic, input validation, lifecycle guards, and conflict detection decoupled from HTTP layers and database drivers.
+  - `services/notificationService.ts`: Event-driven architecture utilizing Node.js `EventEmitter` to dispatch domain events (`appointment:created`, `appointment:cancelled`, `appointment:rescheduled`, `appointment:completed`) and generate automated customer notifications.
+  - `utils/exporter.ts`: RFC 5545 iCalendar (`.ics`) generation for Google Calendar/Outlook import and RFC 4180 CSV spreadsheet export.
   - `db/`: Connection pooling (`pg.Pool`), automated schema verification, index optimization, and graceful connection teardown.
   - `app.ts`: HTTP request dispatcher, payload size security limits, and standardized JSON responses.
   - `server.ts`: Server bootstrapping, dependency injection, environment port binding, and graceful shutdown handling (`SIGTERM`/`SIGINT`).
@@ -28,6 +30,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
     CREATE UNIQUE INDEX idx_unique_confirmed_slot ON appointments (date, time) WHERE status = 'CONFIRMED';
     ```
     Cancelled appointments automatically liberate the time slot.
+  - **Lifecycle State Machine:** Supports `PENDING`, `CONFIRMED`, `COMPLETED`, `CANCELLED`, `NO_SHOW` with transition guards blocking modifications to cancelled or completed appointments.
   - Strict payload size limit (1 MB max) to prevent memory exhaustion / DoS attacks.
   - In-memory rate limiting with sliding window (`429 Too Many Requests`, `Retry-After`, `X-RateLimit-*` headers) to safeguard against brute-force attacks.
   - API Key Authentication: Destructive administrative operations (such as `DELETE /appointments/:id`) are guarded via `X-API-Key` or `Authorization: Bearer <key>` headers (`401 Unauthorized`).
@@ -47,10 +50,14 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/health` / `/health/live` | Liveness probe (uptime & memory metrics) | `200` |
 | `GET` | `/health/ready` | Database readiness probe (active ping & pool statistics) | `200`, `503` |
 | `GET` | `/metrics` | Prometheus metrics for cloud monitoring and Grafana scraping | `200` |
-| `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`) | `200`, `400` |
+| `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`, `serviceType`, `email`) | `200`, `400` |
 | `GET` | `/appointments/slots` | Discover available and booked time slots for a given date | `200`, `400` |
+| `GET` | `/appointments/export` | Export appointments schedule in CSV or iCalendar (`.ics`) format | `200`, `400` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
+| `GET` | `/appointments/:id/export` | Download iCalendar invite (`.ics`) or CSV for a single appointment | `200`, `404` |
 | `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |
+| `POST` | `/appointments/:id/cancel` | Quick action to cancel an appointment and free its time slot | `200`, `400`, `404` |
+| `POST` | `/appointments/:id/complete` | Mark an appointment session as completed | `200`, `400`, `404` |
 | `PATCH` | `/appointments/:id` | Update customer, reschedule date/time, or cancel status | `200`, `400`, `404`, `409` |
 | `DELETE` | `/appointments/:id` | Remove an appointment (Admin protected via `X-API-Key`) | `200`, `401`, `404` |
 

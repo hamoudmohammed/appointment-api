@@ -11,10 +11,12 @@ import {
 } from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
 import { InMemoryAppointmentRepository } from '../repositories/inMemoryAppointmentRepository.js';
+import { domainEventBus, DomainEventBus } from './notificationService.js';
 
 export class AppointmentService {
   constructor(
-    private readonly repository: IAppointmentRepository = new InMemoryAppointmentRepository()
+    private readonly repository: IAppointmentRepository = new InMemoryAppointmentRepository(),
+    private readonly eventBus: DomainEventBus = domainEventBus
   ) {}
 
   public async getAll(filter?: AppointmentQueryFilter): Promise<ServiceResult<PaginatedAppointmentsResult>> {
@@ -156,6 +158,9 @@ export class AppointmentService {
         time: dto.time,
         status: 'CONFIRMED'
       });
+
+      this.eventBus.dispatch('appointment:created', newAppointment);
+
       return { success: true, data: newAppointment };
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
@@ -247,6 +252,22 @@ export class AppointmentService {
         };
       }
 
+      // Check if rescheduled
+      if (
+        (dto.date && dto.date !== current.date) ||
+        (dto.time && dto.time !== current.time)
+      ) {
+        this.eventBus.dispatch('appointment:rescheduled', {
+          appointment: updatedAppointment,
+          oldDate: current.date,
+          oldTime: current.time
+        });
+      } else if (dto.status === 'CANCELLED') {
+        this.eventBus.dispatch('appointment:cancelled', updatedAppointment);
+      } else if (dto.status === 'COMPLETED') {
+        this.eventBus.dispatch('appointment:completed', updatedAppointment);
+      }
+
       return { success: true, data: updatedAppointment };
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
@@ -296,6 +317,9 @@ export class AppointmentService {
     }
 
     const updated = await this.repository.update(id, { status: 'CANCELLED' });
+    if (updated) {
+      this.eventBus.dispatch('appointment:cancelled', updated);
+    }
     return { success: true, data: updated! };
   }
 
@@ -322,6 +346,9 @@ export class AppointmentService {
     }
 
     const updated = await this.repository.update(id, { status: 'COMPLETED' });
+    if (updated) {
+      this.eventBus.dispatch('appointment:completed', updated);
+    }
     return { success: true, data: updated! };
   }
 

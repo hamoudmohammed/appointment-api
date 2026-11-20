@@ -481,6 +481,128 @@ export const openApiSpec = {
           }
         }
       }
+    },
+    '/appointments/export': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'Export appointments (CSV or iCalendar)',
+        description: 'Downloads schedule in CSV format or iCalendar (.ics) format compatible with Google Calendar, Apple Calendar, and Outlook.',
+        parameters: [
+          {
+            name: 'format',
+            in: 'query',
+            description: 'Export format: "ics" or "csv"',
+            schema: { type: 'string', enum: ['ics', 'csv'], default: 'ics' }
+          },
+          {
+            name: 'status',
+            in: 'query',
+            description: 'Filter by status',
+            schema: { type: 'string', enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Calendar file or CSV stream',
+            content: {
+              'text/calendar': { schema: { type: 'string' } },
+              'text/csv': { schema: { type: 'string' } }
+            }
+          },
+          '400': {
+            description: 'Invalid format requested',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
+    },
+    '/appointments/{id}/cancel': {
+      post: {
+        tags: ['Appointments'],
+        summary: 'Cancel an appointment (Quick Action)',
+        description: 'Cancels the appointment and liberates its time slot.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'integer' }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Appointment successfully cancelled',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Appointment cancelled successfully' },
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Cannot cancel completed appointment',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
+    },
+    '/appointments/{id}/complete': {
+      post: {
+        tags: ['Appointments'],
+        summary: 'Mark an appointment as completed',
+        description: 'Marks a confirmed appointment as completed after the session.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'integer' }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Appointment marked as completed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Appointment marked as completed successfully' },
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Cannot complete a cancelled appointment',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
     }
   },
   components: {
@@ -499,9 +621,21 @@ export const openApiSpec = {
         properties: {
           id: { type: 'integer', example: 1 },
           customer: { type: 'string', example: 'Max Mustermann' },
+          email: { type: 'string', format: 'email', example: 'max@example.com' },
+          phone: { type: 'string', example: '+49 151 12345678' },
+          serviceType: {
+            type: 'string',
+            enum: ['CONSULTATION', 'CHECKUP', 'TREATMENT', 'FOLLOW_UP'],
+            example: 'CONSULTATION'
+          },
+          notes: { type: 'string', example: 'Initial consultation notes' },
           date: { type: 'string', format: 'date', example: '2026-11-20', description: 'YYYY-MM-DD' },
           time: { type: 'string', example: '10:00', description: 'HH:mm (24h format)' },
-          status: { type: 'string', enum: ['CONFIRMED', 'CANCELLED'], example: 'CONFIRMED' },
+          status: {
+            type: 'string',
+            enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
+            example: 'CONFIRMED'
+          },
           createdAt: { type: 'string', format: 'date-time', example: '2026-11-14T10:00:00.000Z' }
         }
       },
@@ -510,6 +644,14 @@ export const openApiSpec = {
         required: ['customer', 'date', 'time'],
         properties: {
           customer: { type: 'string', example: 'Sarah Connor' },
+          email: { type: 'string', format: 'email', example: 'sarah@example.com' },
+          phone: { type: 'string', example: '+1 555 0199' },
+          serviceType: {
+            type: 'string',
+            enum: ['CONSULTATION', 'CHECKUP', 'TREATMENT', 'FOLLOW_UP'],
+            example: 'CONSULTATION'
+          },
+          notes: { type: 'string', example: 'Needs follow-up' },
           date: { type: 'string', format: 'date', example: '2026-12-01', description: 'YYYY-MM-DD' },
           time: { type: 'string', example: '14:30', description: 'HH:mm (24h format)' }
         }
@@ -518,9 +660,21 @@ export const openApiSpec = {
         type: 'object',
         properties: {
           customer: { type: 'string', example: 'Sarah Connor Updated' },
+          email: { type: 'string', format: 'email', example: 'sarah.updated@example.com' },
+          phone: { type: 'string', example: '+1 555 0199' },
+          serviceType: {
+            type: 'string',
+            enum: ['CONSULTATION', 'CHECKUP', 'TREATMENT', 'FOLLOW_UP'],
+            example: 'CONSULTATION'
+          },
+          notes: { type: 'string', example: 'Updated notes' },
           date: { type: 'string', format: 'date', example: '2026-12-02' },
           time: { type: 'string', example: '15:00' },
-          status: { type: 'string', enum: ['CONFIRMED', 'CANCELLED'], example: 'CONFIRMED' }
+          status: {
+            type: 'string',
+            enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
+            example: 'CONFIRMED'
+          }
         }
       },
       ErrorResponse: {
