@@ -17,6 +17,7 @@ import { Logger } from './utils/logger.js';
 import { DatabaseHealthStatus } from './db/pool.js';
 import { validateApiKey } from './utils/auth.js';
 import { globalMetrics } from './utils/metrics.js';
+import { exportToCsv, exportToIcs } from './utils/exporter.js';
 
 export type DatabaseHealthChecker = () => Promise<DatabaseHealthStatus>;
 
@@ -205,6 +206,55 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
+    // GET /appointments/export (Supports format=ics and format=csv)
+    if (method === 'GET' && pathname === '/appointments/export') {
+      const format = (url.searchParams.get('format') || 'ics').toLowerCase();
+      if (format !== 'ics' && format !== 'csv') {
+        sendJson(res, 400, {
+          error: 'Query parameter "format" must be either "ics" or "csv".',
+          errorType: 'VALIDATION_ERROR'
+        });
+        return;
+      }
+
+      const filter: AppointmentQueryFilter = {
+        date: url.searchParams.get('date') ?? undefined,
+        startDate: url.searchParams.get('startDate') ?? undefined,
+        endDate: url.searchParams.get('endDate') ?? undefined,
+        status: (url.searchParams.get('status') as AppointmentStatus) ?? undefined,
+        customer: url.searchParams.get('customer') ?? undefined,
+        email: url.searchParams.get('email') ?? undefined,
+        serviceType: (url.searchParams.get('serviceType') as AppointmentServiceType) ?? undefined,
+        limit: 100
+      };
+
+      const result = await currentService.getAll(filter);
+      if (!result.success) {
+        sendJson(res, 400, { error: result.error, errorType: result.errorType });
+        return;
+      }
+
+      const items = result.data?.data || [];
+
+      if (format === 'csv') {
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="appointments.csv"',
+          'X-Content-Type-Options': 'nosniff'
+        });
+        res.end(exportToCsv(items));
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="appointments.ics"',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      res.end(exportToIcs(items));
+      return;
+    }
+
     // GET /appointments
     if (method === 'GET' && pathname === '/appointments') {
       const pageParam = url.searchParams.get('page');
@@ -269,6 +319,44 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         return;
       }
       sendJson(res, 200, { message: 'Appointment marked as completed successfully', data: result.data });
+      return;
+    }
+
+    // Single appointment export (/appointments/:id/export)
+    const singleExportMatch = pathname.match(/^\/appointments\/(\d+)\/export$/);
+    if (method === 'GET' && singleExportMatch) {
+      const id = parseInt(singleExportMatch[1], 10);
+      const item = await currentService.getById(id);
+      if (!item) {
+        sendJson(res, 404, { error: `Appointment with ID ${id} not found.` });
+        return;
+      }
+
+      const format = (url.searchParams.get('format') || 'ics').toLowerCase();
+      if (format !== 'ics' && format !== 'csv') {
+        sendJson(res, 400, {
+          error: 'Query parameter "format" must be either "ics" or "csv".',
+          errorType: 'VALIDATION_ERROR'
+        });
+        return;
+      }
+
+      if (format === 'csv') {
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="appointment-${id}.csv"`,
+          'X-Content-Type-Options': 'nosniff'
+        });
+        res.end(exportToCsv([item]));
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': `attachment; filename="appointment-${id}.ics"`,
+        'X-Content-Type-Options': 'nosniff'
+      });
+      res.end(exportToIcs([item]));
       return;
     }
 

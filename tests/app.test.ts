@@ -119,6 +119,34 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(typeof data.totalPages, 'number');
   });
 
+  test('GET /appointments/export returns CSV and iCalendar files', async () => {
+    // Test CSV export
+    const csvRes = await fetch(`${baseUrl}/appointments/export?format=csv`);
+    assert.strictEqual(csvRes.status, 200);
+    assert.match(csvRes.headers.get('content-type') || '', /text\/csv/);
+    const csvText = await csvRes.text();
+    assert.match(csvText, /ID,Customer,Email,Phone/);
+    assert.match(csvText, /Max Mustermann/);
+
+    // Test ICS export
+    const icsRes = await fetch(`${baseUrl}/appointments/export?format=ics`);
+    assert.strictEqual(icsRes.status, 200);
+    assert.match(icsRes.headers.get('content-type') || '', /text\/calendar/);
+    const icsText = await icsRes.text();
+    assert.match(icsText, /BEGIN:VCALENDAR/);
+    assert.match(icsText, /BEGIN:VEVENT/);
+
+    // Test single appointment export
+    const singleIcsRes = await fetch(`${baseUrl}/appointments/1/export?format=ics`);
+    assert.strictEqual(singleIcsRes.status, 200);
+    const singleIcsText = await singleIcsRes.text();
+    assert.match(singleIcsText, /UID:appointment-1@appointment-api/);
+
+    // Test invalid format returns 400
+    const badFormatRes = await fetch(`${baseUrl}/appointments/export?format=xml`);
+    assert.strictEqual(badFormatRes.status, 400);
+  });
+
   test('GET /appointments/slots returns available slot breakdown', async () => {
     // Missing date query param
     const badRes = await fetch(`${baseUrl}/appointments/slots`);
