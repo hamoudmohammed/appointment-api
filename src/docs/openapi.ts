@@ -135,6 +135,44 @@ export const openApiSpec = {
         }
       }
     },
+    '/auth/verify': {
+      post: {
+        tags: ['System'],
+        summary: 'Verify administrative API Key',
+        description: 'Tests and verifies if the provided API Key is authentic and authorized.',
+        security: [{ ApiKeyAuth: [] }],
+        responses: {
+          '200': {
+            description: 'API Key is authentic',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    valid: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'API Key successfully verified and authorized.' }
+                  }
+                }
+              }
+            }
+          },
+          '401': {
+            description: 'Invalid API Key provided',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    valid: { type: 'boolean', example: false },
+                    error: { type: 'string', example: 'Unauthorized: Invalid API key provided.' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     '/appointments': {
       get: {
         tags: ['Appointments'],
@@ -708,7 +746,7 @@ export const swaggerUiHtml = `<!DOCTYPE html>
   <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js"></script>
   <script>
     window.onload = function() {
-      SwaggerUIBundle({
+      const ui = SwaggerUIBundle({
         url: '/openapi.json',
         dom_id: '#swagger-ui',
         deepLinking: true,
@@ -718,6 +756,81 @@ export const swaggerUiHtml = `<!DOCTYPE html>
         ],
         layout: 'BaseLayout'
       });
+
+      // Intercept and strictly validate API Key before Swagger authorizes it
+      document.addEventListener('click', async function(e) {
+        const btn = e.target.closest('button.auth.authorize, button.modal-btn.auth');
+        if (!btn) return;
+
+        const modal = btn.closest('.modal-ux, .dialog-ux');
+        if (!modal) return;
+
+        const input = modal.querySelector('input[type="text"], input[type="password"]');
+        if (!input) return;
+
+        const enteredKey = input.value.trim();
+
+        // Halt Swagger's default unconditional acceptance
+        e.preventDefault();
+        e.stopPropagation();
+
+        let feedback = modal.querySelector('#custom-auth-feedback');
+        if (!feedback) {
+          feedback = document.createElement('div');
+          feedback.id = 'custom-auth-feedback';
+          feedback.style.marginTop = '12px';
+          feedback.style.padding = '10px 14px';
+          feedback.style.borderRadius = '6px';
+          feedback.style.fontSize = '14px';
+          feedback.style.fontWeight = 'bold';
+          btn.parentNode.insertBefore(feedback, btn.nextSibling);
+        }
+
+        feedback.style.display = 'block';
+        feedback.style.backgroundColor = '#e3f2fd';
+        feedback.style.color = '#1565c0';
+        feedback.style.border = '1px solid #90caf9';
+        feedback.innerText = '⏳ Verifying API key with server...';
+
+        try {
+          const res = await fetch('/auth/verify', {
+            method: 'POST',
+            headers: { 'X-API-Key': enteredKey }
+          });
+
+          if (res.status === 200) {
+            feedback.style.backgroundColor = '#e8f5e9';
+            feedback.style.color = '#2e7d32';
+            feedback.style.border = '1px solid #a5d6a7';
+            feedback.innerText = '✅ Correct password! Authorized successfully.';
+
+            // Authorize Swagger UI store
+            if (ui && ui.authActions && ui.authActions.authorize) {
+              ui.authActions.authorize({
+                ApiKeyAuth: {
+                  name: 'X-API-Key',
+                  schema: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+                  value: enteredKey
+                }
+              });
+            }
+          } else {
+            feedback.style.backgroundColor = '#ffebee';
+            feedback.style.color = '#c62828';
+            feedback.style.border = '1px solid #ef9a9a';
+            feedback.innerText = '❌ Wrong password! Server rejected authorization (401 Unauthorized).';
+
+            // Ensure Swagger does not mark as authorized
+            if (ui && ui.authActions && ui.authActions.logout) {
+              ui.authActions.logout(['ApiKeyAuth']);
+            }
+          }
+        } catch (err) {
+          feedback.style.backgroundColor = '#ffebee';
+          feedback.style.color = '#c62828';
+          feedback.innerText = '❌ Network error: Could not verify with server.';
+        }
+      }, true);
     };
   </script>
 </body>

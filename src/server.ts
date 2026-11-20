@@ -59,6 +59,11 @@ async function bootstrap(): Promise<void> {
     console.log(`[appointment-api] Server running on http://${HOST}:${PORT}`);
     console.log(`[appointment-api] Documentation (Swagger UI): http://${HOST}:${PORT}/docs`);
     console.log(`[appointment-api] Health check: http://${HOST}:${PORT}/health`);
+    if (process.env.ADMIN_API_KEY) {
+      console.log('[appointment-api] Administrative API key configured from environment.');
+    } else {
+      console.warn('[appointment-api] Notice: ADMIN_API_KEY is not set. Set it in .env to enable administrative operations.');
+    }
   });
 }
 

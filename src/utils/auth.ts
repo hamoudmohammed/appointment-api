@@ -14,8 +14,15 @@ export interface AuthValidationResult {
  */
 export function validateApiKey(
   req: IncomingMessage,
-  expectedKey: string = process.env.ADMIN_API_KEY || 'admin-secret-key-123'
+  expectedKey: string = process.env.ADMIN_API_KEY || ''
 ): AuthValidationResult {
+  if (!expectedKey) {
+    return {
+      authenticated: false,
+      error: 'Unauthorized: Server has no ADMIN_API_KEY configured.'
+    };
+  }
+
   const xApiKey = req.headers['x-api-key'];
   const authHeader = req.headers['authorization'];
 

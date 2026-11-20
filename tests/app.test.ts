@@ -5,7 +5,8 @@ import {
   requestHandler,
   setAppointmentService,
   setRateLimiter,
-  setDatabaseHealthChecker
+  setDatabaseHealthChecker,
+  setAdminApiKey
 } from '../src/app.js';
 import { AppointmentService } from '../src/services/appointmentService.js';
 import { InMemoryAppointmentRepository } from '../src/repositories/inMemoryAppointmentRepository.js';
@@ -29,6 +30,7 @@ describe('HTTP API Endpoints', () => {
   beforeEach(() => {
     setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
     setRateLimiter(new MemoryRateLimiter({ windowMs: 60000, maxRequests: 100 }));
+    setAdminApiKey('test-admin-secret-key');
     setDatabaseHealthChecker(async () => ({
       status: 'healthy',
       storage: 'in-memory',
@@ -106,6 +108,26 @@ describe('HTTP API Endpoints', () => {
     assert.match(res.headers.get('content-type') || '', /text\/html/);
     assert.match(html, /swagger-ui/i);
     assert.match(html, /\/openapi\.json/);
+  });
+
+  test('POST /auth/verify validates API key', async () => {
+    // Valid key
+    const validRes = await fetch(`${baseUrl}/auth/verify`, {
+      method: 'POST',
+      headers: { 'X-API-Key': 'test-admin-secret-key' }
+    });
+    const validData = await validRes.json();
+    assert.strictEqual(validRes.status, 200);
+    assert.strictEqual(validData.valid, true);
+
+    // Invalid key
+    const invalidRes = await fetch(`${baseUrl}/auth/verify`, {
+      method: 'POST',
+      headers: { 'X-API-Key': 'wrong-password' }
+    });
+    const invalidData = await invalidRes.json();
+    assert.strictEqual(invalidRes.status, 401);
+    assert.strictEqual(invalidData.valid, false);
   });
 
   test('GET /appointments returns list with pagination metadata', async () => {
@@ -284,7 +306,7 @@ describe('HTTP API Endpoints', () => {
     // Delete it with valid X-API-Key
     const delRes = await fetch(`${baseUrl}/appointments/${idToDelete}`, {
       method: 'DELETE',
-      headers: { 'X-API-Key': 'admin-secret-key-123' }
+      headers: { 'X-API-Key': 'test-admin-secret-key' }
     });
     const delData = await delRes.json();
     assert.strictEqual(delRes.status, 200);
@@ -298,7 +320,7 @@ describe('HTTP API Endpoints', () => {
   test('DELETE /appointments/:id returns 404 for unknown id when authenticated', async () => {
     const res = await fetch(`${baseUrl}/appointments/8888`, {
       method: 'DELETE',
-      headers: { 'X-API-Key': 'admin-secret-key-123' }
+      headers: { 'X-API-Key': 'test-admin-secret-key' }
     });
     assert.strictEqual(res.status, 404);
   });

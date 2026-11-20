@@ -23,7 +23,7 @@ export type DatabaseHealthChecker = () => Promise<DatabaseHealthStatus>;
 
 let currentService = new AppointmentService();
 let currentRateLimiter = new MemoryRateLimiter();
-let currentAdminApiKey = process.env.ADMIN_API_KEY || 'admin-secret-key-123';
+let currentAdminApiKey = process.env.ADMIN_API_KEY || '';
 let currentDbHealthChecker: DatabaseHealthChecker = async () => ({
   status: 'healthy',
   storage: 'in-memory',
@@ -197,6 +197,34 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     // Interactive Swagger UI documentation
     if (method === 'GET' && (pathname === '/docs' || pathname === '/docs/')) {
       sendHtml(res, 200, swaggerUiHtml);
+      return;
+    }
+
+    // POST /auth/verify (Live verification of API Key)
+    if (method === 'POST' && pathname === '/auth/verify') {
+      if (!currentAdminApiKey) {
+        sendJson(res, 503, {
+          valid: false,
+          error: 'Administrative operations are disabled because ADMIN_API_KEY is not configured on this server.',
+          errorType: 'SERVER_MISCONFIGURED'
+        });
+        return;
+      }
+
+      const auth = validateApiKey(req, currentAdminApiKey);
+      if (!auth.authenticated) {
+        sendJson(res, 401, {
+          valid: false,
+          error: auth.error,
+          errorType: 'UNAUTHORIZED'
+        });
+        return;
+      }
+
+      sendJson(res, 200, {
+        valid: true,
+        message: 'API Key successfully verified and authorized.'
+      });
       return;
     }
 
@@ -393,6 +421,14 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
 
     // DELETE /appointments/:id (Protected by API Key Authentication)
     if (method === 'DELETE' && singleMatch) {
+      if (!currentAdminApiKey) {
+        sendJson(res, 503, {
+          error: 'Administrative operations are disabled because ADMIN_API_KEY is not configured on this server.',
+          errorType: 'SERVER_MISCONFIGURED'
+        });
+        return;
+      }
+
       const auth = validateApiKey(req, currentAdminApiKey);
       if (!auth.authenticated) {
         sendJson(res, 401, { error: auth.error, errorType: 'UNAUTHORIZED' });
