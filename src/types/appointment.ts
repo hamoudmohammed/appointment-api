@@ -1,8 +1,18 @@
 export type AppointmentStatus = 'CONFIRMED' | 'CANCELLED';
 
+export type AppointmentServiceType =
+  | 'CONSULTATION'
+  | 'CHECKUP'
+  | 'TREATMENT'
+  | 'FOLLOW_UP';
+
 export interface Appointment {
   id: number;
   customer: string;
+  email?: string | undefined;
+  phone?: string | undefined;
+  serviceType: AppointmentServiceType;
+  notes?: string | undefined;
   date: string; // ISO date format: YYYY-MM-DD
   time: string; // 24-hour format: HH:mm
   status: AppointmentStatus;
@@ -11,15 +21,23 @@ export interface Appointment {
 
 export interface CreateAppointmentDTO {
   customer: string;
+  email?: string | undefined;
+  phone?: string | undefined;
+  serviceType?: AppointmentServiceType | undefined;
+  notes?: string | undefined;
   date: string;
   time: string;
 }
 
 export interface UpdateAppointmentDTO {
-  customer?: string;
-  date?: string;
-  time?: string;
-  status?: AppointmentStatus;
+  customer?: string | undefined;
+  email?: string | undefined;
+  phone?: string | undefined;
+  serviceType?: AppointmentServiceType | undefined;
+  notes?: string | undefined;
+  date?: string | undefined;
+  time?: string | undefined;
+  status?: AppointmentStatus | undefined;
 }
 
 export type ServiceErrorType = 'VALIDATION_ERROR' | 'CONFLICT' | 'NOT_FOUND' | 'UNAUTHORIZED';
@@ -37,6 +55,8 @@ export interface AppointmentQueryFilter {
   endDate?: string | undefined;
   status?: AppointmentStatus | undefined;
   customer?: string | undefined;
+  email?: string | undefined;
+  serviceType?: AppointmentServiceType | undefined;
   page?: number | undefined;
   limit?: number | undefined;
 }

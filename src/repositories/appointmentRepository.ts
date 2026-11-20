@@ -1,7 +1,16 @@
-import { Appointment, AppointmentStatus, AppointmentQueryFilter } from '../types/appointment.js';
+import {
+  Appointment,
+  AppointmentStatus,
+  AppointmentServiceType,
+  AppointmentQueryFilter
+} from '../types/appointment.js';
 
 export interface CreateAppointmentRecord {
   customer: string;
+  email?: string | undefined;
+  phone?: string | undefined;
+  serviceType?: AppointmentServiceType | undefined;
+  notes?: string | undefined;
   date: string;
   time: string;
   status: AppointmentStatus;
@@ -9,6 +18,10 @@ export interface CreateAppointmentRecord {
 
 export interface UpdateAppointmentRecord {
   customer?: string | undefined;
+  email?: string | undefined;
+  phone?: string | undefined;
+  serviceType?: AppointmentServiceType | undefined;
+  notes?: string | undefined;
   date?: string | undefined;
   time?: string | undefined;
   status?: AppointmentStatus | undefined;

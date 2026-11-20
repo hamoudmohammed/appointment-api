@@ -147,6 +147,10 @@ export class AppointmentService {
     try {
       const newAppointment = await this.repository.create({
         customer: dto.customer.trim(),
+        email: dto.email ? dto.email.trim() : undefined,
+        phone: dto.phone ? dto.phone.trim() : undefined,
+        serviceType: dto.serviceType || 'CONSULTATION',
+        notes: dto.notes ? dto.notes.trim() : undefined,
         date: dto.date,
         time: dto.time,
         status: 'CONFIRMED'
@@ -200,6 +204,10 @@ export class AppointmentService {
     try {
       const updatedAppointment = await this.repository.update(id, {
         customer: dto.customer !== undefined ? dto.customer.trim() : undefined,
+        email: dto.email !== undefined ? dto.email.trim() : undefined,
+        phone: dto.phone !== undefined ? dto.phone.trim() : undefined,
+        serviceType: dto.serviceType,
+        notes: dto.notes !== undefined ? dto.notes.trim() : undefined,
         date: dto.date,
         time: dto.time,
         status: dto.status
@@ -239,6 +247,15 @@ export class AppointmentService {
     return { success: true, data: deleted };
   }
 
+  private static readonly ALLOWED_SERVICE_TYPES = [
+    'CONSULTATION',
+    'CHECKUP',
+    'TREATMENT',
+    'FOLLOW_UP'
+  ];
+
+  private static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   private validateDTO(dto: CreateAppointmentDTO): string | null {
     if (!dto || typeof dto !== 'object') {
       return 'Request body must be a valid JSON object.';
@@ -246,6 +263,24 @@ export class AppointmentService {
 
     if (!dto.customer || typeof dto.customer !== 'string' || dto.customer.trim().length === 0) {
       return 'Field "customer" is required and cannot be empty.';
+    }
+
+    if (dto.email !== undefined && dto.email !== null) {
+      if (typeof dto.email !== 'string' || !AppointmentService.EMAIL_REGEX.test(dto.email.trim())) {
+        return 'Field "email" must be a valid email address.';
+      }
+    }
+
+    if (dto.phone !== undefined && dto.phone !== null) {
+      if (typeof dto.phone !== 'string' || dto.phone.trim().length < 5) {
+        return 'Field "phone" must be at least 5 characters long.';
+      }
+    }
+
+    if (dto.serviceType !== undefined && dto.serviceType !== null) {
+      if (!AppointmentService.ALLOWED_SERVICE_TYPES.includes(dto.serviceType)) {
+        return `Field "serviceType" must be one of: ${AppointmentService.ALLOWED_SERVICE_TYPES.join(', ')}.`;
+      }
     }
 
     // Validate date format YYYY-MM-DD
@@ -270,16 +305,38 @@ export class AppointmentService {
 
     if (
       dto.customer === undefined &&
+      dto.email === undefined &&
+      dto.phone === undefined &&
+      dto.serviceType === undefined &&
+      dto.notes === undefined &&
       dto.date === undefined &&
       dto.time === undefined &&
       dto.status === undefined
     ) {
-      return 'At least one field (customer, date, time, status) must be provided for update.';
+      return 'At least one field must be provided for update.';
     }
 
     if (dto.customer !== undefined) {
       if (typeof dto.customer !== 'string' || dto.customer.trim().length === 0) {
         return 'Field "customer" cannot be empty.';
+      }
+    }
+
+    if (dto.email !== undefined && dto.email !== null) {
+      if (typeof dto.email !== 'string' || !AppointmentService.EMAIL_REGEX.test(dto.email.trim())) {
+        return 'Field "email" must be a valid email address.';
+      }
+    }
+
+    if (dto.phone !== undefined && dto.phone !== null) {
+      if (typeof dto.phone !== 'string' || dto.phone.trim().length < 5) {
+        return 'Field "phone" must be at least 5 characters long.';
+      }
+    }
+
+    if (dto.serviceType !== undefined && dto.serviceType !== null) {
+      if (!AppointmentService.ALLOWED_SERVICE_TYPES.includes(dto.serviceType)) {
+        return `Field "serviceType" must be one of: ${AppointmentService.ALLOWED_SERVICE_TYPES.join(', ')}.`;
       }
     }
 
@@ -321,6 +378,12 @@ export class AppointmentService {
 
     if (filter.status !== undefined && filter.status !== 'CONFIRMED' && filter.status !== 'CANCELLED') {
       return 'Query parameter "status" must be either "CONFIRMED" or "CANCELLED".';
+    }
+
+    if (filter.serviceType !== undefined) {
+      if (!AppointmentService.ALLOWED_SERVICE_TYPES.includes(filter.serviceType)) {
+        return `Query parameter "serviceType" must be one of: ${AppointmentService.ALLOWED_SERVICE_TYPES.join(', ')}.`;
+      }
     }
 
     if (filter.page !== undefined && (!Number.isInteger(filter.page) || filter.page < 1)) {

@@ -115,6 +115,51 @@ describe('AppointmentService', () => {
     assert.match(result.error || '', /HH:mm/);
   });
 
+  test('create() accepts valid email, phone, and serviceType', async () => {
+    const result = await service.create({
+      customer: 'Alice Wonder',
+      email: 'alice@example.com',
+      phone: '+49 170 98765432',
+      serviceType: 'TREATMENT',
+      notes: 'Special care needed',
+      date: '2026-12-02',
+      time: '11:00'
+    });
+
+    assert.strictEqual(result.success, true);
+    assert.ok(result.data);
+    assert.strictEqual(result.data?.email, 'alice@example.com');
+    assert.strictEqual(result.data?.serviceType, 'TREATMENT');
+    assert.strictEqual(result.data?.notes, 'Special care needed');
+  });
+
+  test('create() rejects invalid email format', async () => {
+    const result = await service.create({
+      customer: 'Invalid Email Person',
+      email: 'invalid-email-string',
+      date: '2026-12-02',
+      time: '12:00'
+    });
+
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
+    assert.match(result.error || '', /email/i);
+  });
+
+  test('create() rejects invalid serviceType', async () => {
+    const result = await service.create({
+      customer: 'Bob Person',
+      // @ts-expect-error test invalid enum
+      serviceType: 'SURGERY',
+      date: '2026-12-02',
+      time: '12:00'
+    });
+
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.errorType, 'VALIDATION_ERROR');
+    assert.match(result.error || '', /serviceType/i);
+  });
+
   describe('update()', () => {
     test('successfully updates customer name', async () => {
       const result = await service.update(1, { customer: 'Max Updated' });

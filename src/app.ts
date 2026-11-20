@@ -4,7 +4,8 @@ import {
   CreateAppointmentDTO,
   UpdateAppointmentDTO,
   AppointmentQueryFilter,
-  AppointmentStatus
+  AppointmentStatus,
+  AppointmentServiceType
 } from './types/appointment.js';
 import { openApiSpec, swaggerUiHtml } from './docs/openapi.js';
 import {
@@ -217,6 +218,8 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         endDate: url.searchParams.get('endDate') ?? undefined,
         status: (url.searchParams.get('status') as AppointmentStatus) ?? undefined,
         customer: url.searchParams.get('customer') ?? undefined,
+        email: url.searchParams.get('email') ?? undefined,
+        serviceType: (url.searchParams.get('serviceType') as AppointmentServiceType) ?? undefined,
         page,
         limit
       };

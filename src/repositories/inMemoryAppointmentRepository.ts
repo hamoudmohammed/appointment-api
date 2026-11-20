@@ -19,6 +19,10 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
         {
           id: 1,
           customer: 'Max Mustermann',
+          email: 'max@example.com',
+          phone: '+49 151 12345678',
+          serviceType: 'CONSULTATION',
+          notes: 'Initial consultation session',
           date: '2026-11-20',
           time: '10:00',
           status: 'CONFIRMED',
@@ -48,6 +52,13 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
       if (filter.customer) {
         const query = filter.customer.trim().toLowerCase();
         result = result.filter((item) => item.customer.toLowerCase().includes(query));
+      }
+      if (filter.email) {
+        const query = filter.email.trim().toLowerCase();
+        result = result.filter((item) => item.email?.toLowerCase().includes(query));
+      }
+      if (filter.serviceType) {
+        result = result.filter((item) => item.serviceType === filter.serviceType);
       }
     }
 
@@ -91,6 +102,10 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
     const newAppointment: Appointment = {
       id: this.nextId++,
       customer: record.customer,
+      email: record.email,
+      phone: record.phone,
+      serviceType: record.serviceType ?? 'CONSULTATION',
+      notes: record.notes,
       date: record.date,
       time: record.time,
       status: record.status,
@@ -111,6 +126,10 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
     const updated: Appointment = {
       ...current,
       customer: record.customer !== undefined ? record.customer : current.customer,
+      email: record.email !== undefined ? record.email : current.email,
+      phone: record.phone !== undefined ? record.phone : current.phone,
+      serviceType: record.serviceType !== undefined ? record.serviceType : current.serviceType,
+      notes: record.notes !== undefined ? record.notes : current.notes,
       date: record.date !== undefined ? record.date : current.date,
       time: record.time !== undefined ? record.time : current.time,
       status: record.status !== undefined ? record.status : current.status

@@ -1,5 +1,10 @@
 import pg from 'pg';
-import { Appointment, AppointmentStatus, AppointmentQueryFilter } from '../types/appointment.js';
+import {
+  Appointment,
+  AppointmentStatus,
+  AppointmentServiceType,
+  AppointmentQueryFilter
+} from '../types/appointment.js';
 import {
   IAppointmentRepository,
   CreateAppointmentRecord,
@@ -10,6 +15,10 @@ import {
 interface AppointmentDbRow {
   id: number;
   customer: string;
+  email?: string | null;
+  phone?: string | null;
+  service_type?: string | null;
+  notes?: string | null;
   date: string | Date;
   time: string;
   status: string;
@@ -30,6 +39,10 @@ function mapRowToAppointment(row: AppointmentDbRow): Appointment {
   return {
     id: row.id,
     customer: row.customer,
+    email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
+    serviceType: (row.service_type as AppointmentServiceType) || 'CONSULTATION',
+    notes: row.notes ?? undefined,
     date: dateStr,
     time: row.time,
     status: row.status as AppointmentStatus,
@@ -65,6 +78,14 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
       conditions.push(`customer ILIKE $${idx++}`);
       values.push(`%${filter.customer.trim()}%`);
     }
+    if (filter?.email) {
+      conditions.push(`email ILIKE $${idx++}`);
+      values.push(`%${filter.email.trim()}%`);
+    }
+    if (filter?.serviceType) {
+      conditions.push(`service_type = $${idx++}`);
+      values.push(filter.serviceType);
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -78,7 +99,7 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
 
     const queryValues = [...values, limit, offset];
     const dataSql = `
-      SELECT id, customer, date, time, status, created_at
+      SELECT id, customer, email, phone, service_type, notes, date, time, status, created_at
       FROM appointments
       ${whereClause}
       ORDER BY date ASC, time ASC, id ASC
@@ -94,7 +115,7 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
 
   public async findById(id: number): Promise<Appointment | undefined> {
     const res = await this.pool.query<AppointmentDbRow>(
-      'SELECT id, customer, date, time, status, created_at FROM appointments WHERE id = $1',
+      'SELECT id, customer, email, phone, service_type, notes, date, time, status, created_at FROM appointments WHERE id = $1',
       [id]
     );
     if (res.rows.length === 0) {
@@ -109,7 +130,7 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
     excludeId?: number
   ): Promise<Appointment | undefined> {
     let query =
-      "SELECT id, customer, date, time, status, created_at FROM appointments WHERE date = $1 AND time = $2 AND status = 'CONFIRMED'";
+      "SELECT id, customer, email, phone, service_type, notes, date, time, status, created_at FROM appointments WHERE date = $1 AND time = $2 AND status = 'CONFIRMED'";
     const params: unknown[] = [date, time];
 
     if (excludeId !== undefined) {
@@ -128,10 +149,19 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
 
   public async create(record: CreateAppointmentRecord): Promise<Appointment> {
     const res = await this.pool.query<AppointmentDbRow>(
-      `INSERT INTO appointments (customer, date, time, status)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, customer, date, time, status, created_at`,
-      [record.customer, record.date, record.time, record.status]
+      `INSERT INTO appointments (customer, email, phone, service_type, notes, date, time, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, customer, email, phone, service_type, notes, date, time, status, created_at`,
+      [
+        record.customer,
+        record.email ?? null,
+        record.phone ?? null,
+        record.serviceType,
+        record.notes ?? null,
+        record.date,
+        record.time,
+        record.status
+      ]
     );
     return mapRowToAppointment(res.rows[0]);
   }
@@ -144,6 +174,22 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
     if (record.customer !== undefined) {
       fields.push(`customer = $${idx++}`);
       values.push(record.customer);
+    }
+    if (record.email !== undefined) {
+      fields.push(`email = $${idx++}`);
+      values.push(record.email);
+    }
+    if (record.phone !== undefined) {
+      fields.push(`phone = $${idx++}`);
+      values.push(record.phone);
+    }
+    if (record.serviceType !== undefined) {
+      fields.push(`service_type = $${idx++}`);
+      values.push(record.serviceType);
+    }
+    if (record.notes !== undefined) {
+      fields.push(`notes = $${idx++}`);
+      values.push(record.notes);
     }
     if (record.date !== undefined) {
       fields.push(`date = $${idx++}`);
@@ -167,7 +213,7 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
       UPDATE appointments
       SET ${fields.join(', ')}
       WHERE id = $${idx}
-      RETURNING id, customer, date, time, status, created_at
+      RETURNING id, customer, email, phone, service_type, notes, date, time, status, created_at
     `;
 
     const res = await this.pool.query<AppointmentDbRow>(query, values);
@@ -179,7 +225,7 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
 
   public async delete(id: number): Promise<Appointment | undefined> {
     const res = await this.pool.query<AppointmentDbRow>(
-      'DELETE FROM appointments WHERE id = $1 RETURNING id, customer, date, time, status, created_at',
+      'DELETE FROM appointments WHERE id = $1 RETURNING id, customer, email, phone, service_type, notes, date, time, status, created_at',
       [id]
     );
     if (res.rows.length === 0) {
