@@ -103,6 +103,36 @@ describe('AppointmentService', () => {
     assert.match(result.error || '', /YYYY-MM-DD/);
   });
 
+  test('create() rejects non-existent calendar dates and accepts valid leap day', async () => {
+    for (const badDate of ['2026-02-29', '2026-02-31', '2026-04-31', '2026-13-01', '2026-00-10']) {
+      const res = await service.create({
+        customer: 'Calendar Edge Case',
+        date: badDate,
+        time: '10:00'
+      });
+      assert.strictEqual(res.success, false, `Expected ${badDate} to be rejected`);
+      assert.strictEqual(res.errorType, 'VALIDATION_ERROR');
+    }
+
+    const leapDay = await service.create({
+      customer: 'Leap Day Booker',
+      date: '2028-02-29',
+      time: '11:30'
+    });
+    assert.strictEqual(leapDay.success, true);
+    assert.strictEqual(leapDay.data?.date, '2028-02-29');
+  });
+
+  test('getAvailableSlots() and getAll() reject non-existent calendar dates', async () => {
+    const slotsRes = await service.getAvailableSlots('2026-02-30');
+    assert.strictEqual(slotsRes.success, false);
+    assert.strictEqual(slotsRes.errorType, 'VALIDATION_ERROR');
+
+    const listRes = await service.getAll({ startDate: '2026-04-31' });
+    assert.strictEqual(listRes.success, false);
+    assert.strictEqual(listRes.errorType, 'VALIDATION_ERROR');
+  });
+
   test('create() rejects appointment with invalid time format', async () => {
     const result = await service.create({
       customer: 'John Doe',

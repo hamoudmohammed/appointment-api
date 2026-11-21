@@ -87,11 +87,10 @@ export class AppointmentService {
       };
     }
 
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(date)) {
+    if (!AppointmentService.isValidCalendarDate(date)) {
       return {
         success: false,
-        error: 'Query parameter "date" must follow YYYY-MM-DD format.',
+        error: 'Query parameter "date" must be a valid calendar date in YYYY-MM-DD format.',
         errorType: 'VALIDATION_ERROR'
       };
     }
@@ -368,6 +367,25 @@ export class AppointmentService {
   ];
 
   private static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  private static readonly DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+  public static isValidCalendarDate(dateStr: string): boolean {
+    if (typeof dateStr !== 'string' || !AppointmentService.DATE_REGEX.test(dateStr)) {
+      return false;
+    }
+
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
+      return false;
+    }
+
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    );
+  }
 
   private validateDTO(dto: CreateAppointmentDTO): string | null {
     if (!dto || typeof dto !== 'object') {
@@ -396,10 +414,9 @@ export class AppointmentService {
       }
     }
 
-    // Validate date format YYYY-MM-DD
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dto.date || !dateRegex.test(dto.date)) {
-      return 'Field "date" is required and must follow YYYY-MM-DD format.';
+    // Validate calendar date in YYYY-MM-DD format
+    if (!dto.date || !AppointmentService.isValidCalendarDate(dto.date)) {
+      return 'Field "date" is required and must be a valid calendar date in YYYY-MM-DD format.';
     }
 
     // Validate time format HH:mm (24-hour)
@@ -453,9 +470,8 @@ export class AppointmentService {
       }
     }
 
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (dto.date !== undefined && (!dto.date || !dateRegex.test(dto.date))) {
-      return 'Field "date" must follow YYYY-MM-DD format.';
+    if (dto.date !== undefined && (!dto.date || !AppointmentService.isValidCalendarDate(dto.date))) {
+      return 'Field "date" must be a valid calendar date in YYYY-MM-DD format.';
     }
 
     const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -471,18 +487,16 @@ export class AppointmentService {
   }
 
   private validateFilter(filter: AppointmentQueryFilter): string | null {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-
-    if (filter.date !== undefined && (!filter.date || !dateRegex.test(filter.date))) {
-      return 'Query parameter "date" must follow YYYY-MM-DD format.';
+    if (filter.date !== undefined && (!filter.date || !AppointmentService.isValidCalendarDate(filter.date))) {
+      return 'Query parameter "date" must be a valid calendar date in YYYY-MM-DD format.';
     }
 
-    if (filter.startDate !== undefined && (!filter.startDate || !dateRegex.test(filter.startDate))) {
-      return 'Query parameter "startDate" must follow YYYY-MM-DD format.';
+    if (filter.startDate !== undefined && (!filter.startDate || !AppointmentService.isValidCalendarDate(filter.startDate))) {
+      return 'Query parameter "startDate" must be a valid calendar date in YYYY-MM-DD format.';
     }
 
-    if (filter.endDate !== undefined && (!filter.endDate || !dateRegex.test(filter.endDate))) {
-      return 'Query parameter "endDate" must follow YYYY-MM-DD format.';
+    if (filter.endDate !== undefined && (!filter.endDate || !AppointmentService.isValidCalendarDate(filter.endDate))) {
+      return 'Query parameter "endDate" must be a valid calendar date in YYYY-MM-DD format.';
     }
 
     if (filter.startDate && filter.endDate && filter.startDate > filter.endDate) {

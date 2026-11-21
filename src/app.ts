@@ -462,14 +462,26 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     sendJson(res, 404, { error: `Route ${method} ${pathname} not found.` });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
-    const statusCode = message === 'Payload Too Large' ? 413 : 500;
-    Logger.error('Unhandled request exception', {
-      requestId,
-      method: req.method?.toUpperCase(),
-      path: req.url,
-      statusCode,
-      error: message
-    });
-    sendJson(res, statusCode, { error: message });
+    let statusCode = 500;
+    let errorType = 'INTERNAL_SERVER_ERROR';
+
+    if (message === 'Payload Too Large') {
+      statusCode = 413;
+      errorType = 'PAYLOAD_TOO_LARGE';
+    } else if (message === 'Invalid JSON format') {
+      statusCode = 400;
+      errorType = 'VALIDATION_ERROR';
+    }
+
+    if (statusCode >= 500) {
+      Logger.error('Unhandled request exception', {
+        requestId,
+        method: req.method?.toUpperCase(),
+        path: req.url,
+        statusCode,
+        error: message
+      });
+    }
+    sendJson(res, statusCode, { error: message, errorType });
   }
 }

@@ -228,6 +228,42 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.data.status, 'CONFIRMED');
   });
 
+  test('POST and PATCH return 400 Bad Request on malformed JSON payloads', async () => {
+    const postRes = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{ invalid json'
+    });
+    const postData = await postRes.json();
+    assert.strictEqual(postRes.status, 400);
+    assert.strictEqual(postData.errorType, 'VALIDATION_ERROR');
+    assert.match(postData.error, /Invalid JSON/i);
+
+    const patchRes = await fetch(`${baseUrl}/appointments/1`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"customer": '
+    });
+    const patchData = await patchRes.json();
+    assert.strictEqual(patchRes.status, 400);
+    assert.strictEqual(patchData.errorType, 'VALIDATION_ERROR');
+  });
+
+  test('POST /appointments returns 400 for non-existent calendar dates like 2026-02-31', async () => {
+    const res = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Invalid Calendar User',
+        date: '2026-02-31',
+        time: '10:00'
+      })
+    });
+    const data = await res.json();
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(data.errorType, 'VALIDATION_ERROR');
+  });
+
   test('PATCH /appointments/:id updates appointment details with 200', async () => {
     const res = await fetch(`${baseUrl}/appointments/1`, {
       method: 'PATCH',
