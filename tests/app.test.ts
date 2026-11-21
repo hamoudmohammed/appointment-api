@@ -5,12 +5,14 @@ import {
   requestHandler,
   setAppointmentService,
   setRateLimiter,
+  setIdempotencyStore,
   setDatabaseHealthChecker,
   setAdminApiKey
 } from '../src/app.js';
 import { AppointmentService } from '../src/services/appointmentService.js';
 import { InMemoryAppointmentRepository } from '../src/repositories/inMemoryAppointmentRepository.js';
 import { MemoryRateLimiter } from '../src/utils/security.js';
+import { IdempotencyStore } from '../src/utils/idempotency.js';
 
 describe('HTTP API Endpoints', () => {
   let server: http.Server;
@@ -30,6 +32,7 @@ describe('HTTP API Endpoints', () => {
   beforeEach(() => {
     setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
     setRateLimiter(new MemoryRateLimiter({ windowMs: 60000, maxRequests: 100 }));
+    setIdempotencyStore(new IdempotencyStore());
     setAdminApiKey('test-admin-secret-key');
     setDatabaseHealthChecker(async () => ({
       status: 'healthy',
@@ -292,6 +295,69 @@ describe('HTTP API Endpoints', () => {
     const data = await res.json();
     assert.strictEqual(res.status, 400);
     assert.strictEqual(data.errorType, 'VALIDATION_ERROR');
+  });
+
+  test('POST /appointments replays identical response for repeated Idempotency-Key and rejects payload mismatch', async () => {
+    const payload = {
+      customer: 'Idempotent User',
+      date: '2026-12-18',
+      time: '13:00'
+    };
+
+    const firstRes = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'req-unique-123'
+      },
+      body: JSON.stringify(payload)
+    });
+    const firstData = await firstRes.json();
+    assert.strictEqual(firstRes.status, 201);
+    assert.strictEqual(firstRes.headers.get('idempotency-replayed'), 'false');
+    assert.strictEqual(firstRes.headers.get('idempotency-key'), 'req-unique-123');
+
+    // Retry with identical key and payload
+    const replayRes = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'req-unique-123'
+      },
+      body: JSON.stringify(payload)
+    });
+    const replayData = await replayRes.json();
+    assert.strictEqual(replayRes.status, 201);
+    assert.strictEqual(replayRes.headers.get('idempotency-replayed'), 'true');
+    assert.strictEqual(replayData.data.id, firstData.data.id);
+
+    // Reuse same key with different payload -> 409 IDEMPOTENCY_CONFLICT
+    const conflictRes = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'req-unique-123'
+      },
+      body: JSON.stringify({
+        customer: 'Different User',
+        date: '2026-12-18',
+        time: '14:00'
+      })
+    });
+    const conflictData = await conflictRes.json();
+    assert.strictEqual(conflictRes.status, 409);
+    assert.strictEqual(conflictData.errorType, 'IDEMPOTENCY_CONFLICT');
+
+    // Overly long key -> 400 VALIDATION_ERROR
+    const invalidKeyRes = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'x'.repeat(129)
+      },
+      body: JSON.stringify(payload)
+    });
+    assert.strictEqual(invalidKeyRes.status, 400);
   });
 
   test('PATCH /appointments/:id updates appointment details with 200', async () => {

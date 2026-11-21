@@ -256,7 +256,16 @@ export const openApiSpec = {
       post: {
         tags: ['Appointments'],
         summary: 'Create a new appointment',
-        description: 'Books a new appointment slot with domain validation and double-booking conflict prevention.',
+        description: 'Books a new appointment slot with domain validation, double-booking conflict prevention, and optional Idempotency-Key support for safe network retries.',
+        parameters: [
+          {
+            name: 'Idempotency-Key',
+            in: 'header',
+            required: false,
+            description: 'Optional unique key (max 128 chars) to safely retry appointment creation without duplicate bookings.',
+            schema: { type: 'string', maxLength: 128, example: 'booking-req-8f3c2a10' }
+          }
+        ],
         requestBody: {
           required: true,
           content: {

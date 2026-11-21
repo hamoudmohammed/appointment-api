@@ -18,11 +18,13 @@ import { DatabaseHealthStatus } from './db/pool.js';
 import { validateApiKey } from './utils/auth.js';
 import { globalMetrics } from './utils/metrics.js';
 import { exportToCsv, exportToIcs } from './utils/exporter.js';
+import { IdempotencyStore } from './utils/idempotency.js';
 
 export type DatabaseHealthChecker = () => Promise<DatabaseHealthStatus>;
 
 let currentService = new AppointmentService();
 let currentRateLimiter = new MemoryRateLimiter();
+let currentIdempotencyStore = new IdempotencyStore();
 let currentAdminApiKey = process.env.ADMIN_API_KEY || '';
 let currentDbHealthChecker: DatabaseHealthChecker = async () => ({
   status: 'healthy',
@@ -52,6 +54,14 @@ export function setRateLimiter(limiter: MemoryRateLimiter): void {
 
 export function getRateLimiter(): MemoryRateLimiter {
   return currentRateLimiter;
+}
+
+export function setIdempotencyStore(store: IdempotencyStore): void {
+  currentIdempotencyStore = store;
+}
+
+export function getIdempotencyStore(): IdempotencyStore {
+  return currentIdempotencyStore;
 }
 
 export function setDatabaseHealthChecker(checker: DatabaseHealthChecker): void {
@@ -458,16 +468,57 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
-    // POST /appointments
+    // POST /appointments (supports optional Idempotency-Key header for safe retries)
     if (method === 'POST' && pathname === '/appointments') {
       const body = await parseJsonBody(req);
+      const rawIdempotencyKey = req.headers['idempotency-key'];
+      const idempotencyKey =
+        typeof rawIdempotencyKey === 'string' ? rawIdempotencyKey.trim() : undefined;
+
+      if (rawIdempotencyKey !== undefined) {
+        if (!idempotencyKey || idempotencyKey.length > 128) {
+          sendJson(res, 400, {
+            error: 'Header "Idempotency-Key" must be a non-empty string of at most 128 characters.',
+            errorType: 'VALIDATION_ERROR'
+          });
+          return;
+        }
+      }
+
+      let requestHash: string | undefined;
+      if (idempotencyKey) {
+        requestHash = IdempotencyStore.computeRequestHash(body);
+        const existing = currentIdempotencyStore.get(idempotencyKey);
+        if (existing) {
+          if (existing.requestHash !== requestHash) {
+            sendJson(res, 409, {
+              error: 'Idempotency-Key was already used with a different request payload.',
+              errorType: 'IDEMPOTENCY_CONFLICT'
+            });
+            return;
+          }
+          res.setHeader('Idempotency-Key', idempotencyKey);
+          res.setHeader('Idempotency-Replayed', 'true');
+          sendJson(res, existing.statusCode, existing.responseBody);
+          return;
+        }
+      }
+
       const result = await currentService.create(body as CreateAppointmentDTO);
       if (!result.success) {
         const statusCode = result.errorType === 'CONFLICT' ? 409 : 400;
         sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
         return;
       }
-      sendJson(res, 201, { message: 'Appointment created successfully', data: result.data });
+
+      const responsePayload = { message: 'Appointment created successfully', data: result.data };
+      if (idempotencyKey && requestHash) {
+        currentIdempotencyStore.set(idempotencyKey, requestHash, 201, responsePayload);
+        res.setHeader('Idempotency-Key', idempotencyKey);
+        res.setHeader('Idempotency-Replayed', 'false');
+      }
+
+      sendJson(res, 201, responsePayload);
       return;
     }
 
