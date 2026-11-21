@@ -96,6 +96,7 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.info.title, 'Appointment REST API');
     assert.ok(data.paths['/appointments']);
     assert.ok(data.paths['/appointments/slots']);
+    assert.ok(data.paths['/appointments/stats']);
     assert.ok(data.paths['/appointments/{id}']);
     assert.ok(data.paths['/metrics']);
     assert.ok(data.components.securitySchemes.ApiKeyAuth);
@@ -184,6 +185,35 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(data.bookedCount, 1);
     assert.strictEqual(data.availableSlots.includes('10:00'), false);
     assert.strictEqual(data.availableSlots.includes('14:00'), true);
+  });
+
+  test('GET /appointments/stats returns aggregated appointment analytics', async () => {
+    await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Stats User',
+        serviceType: 'CHECKUP',
+        date: '2026-11-25',
+        time: '10:00'
+      })
+    });
+
+    const res = await fetch(`${baseUrl}/appointments/stats`);
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(data.totalAppointments, 2);
+    assert.strictEqual(data.byStatus.CONFIRMED, 2);
+    assert.strictEqual(data.byServiceType.CHECKUP, 1);
+    assert.deepStrictEqual(data.busiestTimeSlots[0], { time: '10:00', count: 2 });
+
+    const filteredRes = await fetch(`${baseUrl}/appointments/stats?startDate=2026-11-25&endDate=2026-11-30`);
+    const filteredData = await filteredRes.json();
+    assert.strictEqual(filteredRes.status, 200);
+    assert.strictEqual(filteredData.totalAppointments, 1);
+
+    const invalidRes = await fetch(`${baseUrl}/appointments/stats?startDate=2026-12-10&endDate=2026-12-01`);
+    assert.strictEqual(invalidRes.status, 400);
   });
 
   test('GET /appointments supports filtering and pagination query params', async () => {

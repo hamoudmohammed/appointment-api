@@ -386,4 +386,68 @@ describe('AppointmentService', () => {
       assert.strictEqual(res.data?.availableSlots.includes('10:00'), true);
     });
   });
+
+  describe('getStats()', () => {
+    test('computes counts by status, serviceType, rates, and busiest slots/dates', async () => {
+      const a2 = await service.create({
+        customer: 'Alice',
+        serviceType: 'TREATMENT',
+        date: '2026-11-20',
+        time: '11:00'
+      });
+      const a3 = await service.create({
+        customer: 'Bob',
+        serviceType: 'CHECKUP',
+        date: '2026-11-21',
+        time: '10:00'
+      });
+      const a4 = await service.create({
+        customer: 'Clara',
+        serviceType: 'TREATMENT',
+        date: '2026-11-22',
+        time: '10:00'
+      });
+
+      await service.cancelAppointment(a2.data!.id);
+      await service.completeAppointment(a3.data!.id);
+      assert.ok(a4.success);
+
+      const res = await service.getStats();
+      assert.strictEqual(res.success, true);
+      assert.ok(res.data);
+      assert.strictEqual(res.data?.totalAppointments, 4);
+      assert.strictEqual(res.data?.byStatus.CONFIRMED, 2);
+      assert.strictEqual(res.data?.byStatus.CANCELLED, 1);
+      assert.strictEqual(res.data?.byStatus.COMPLETED, 1);
+      assert.strictEqual(res.data?.byServiceType.TREATMENT, 2);
+      assert.strictEqual(res.data?.byServiceType.CONSULTATION, 1);
+      assert.strictEqual(res.data?.byServiceType.CHECKUP, 1);
+      assert.strictEqual(res.data?.cancellationRatePercent, 25);
+      assert.strictEqual(res.data?.completionRatePercent, 25);
+      assert.deepStrictEqual(res.data?.busiestTimeSlots[0], { time: '10:00', count: 3 });
+      assert.deepStrictEqual(res.data?.busiestDates[0], { date: '2026-11-20', count: 2 });
+    });
+
+    test('filters stats by startDate and endDate and validates date range', async () => {
+      await service.create({
+        customer: 'December User',
+        serviceType: 'FOLLOW_UP',
+        date: '2026-12-15',
+        time: '09:00'
+      });
+
+      const decStats = await service.getStats({ startDate: '2026-12-01', endDate: '2026-12-31' });
+      assert.strictEqual(decStats.success, true);
+      assert.strictEqual(decStats.data?.totalAppointments, 1);
+      assert.strictEqual(decStats.data?.byServiceType.FOLLOW_UP, 1);
+
+      const badRange = await service.getStats({ startDate: '2026-12-31', endDate: '2026-12-01' });
+      assert.strictEqual(badRange.success, false);
+      assert.strictEqual(badRange.errorType, 'VALIDATION_ERROR');
+
+      const badDate = await service.getStats({ startDate: '2026-02-31' });
+      assert.strictEqual(badDate.success, false);
+      assert.strictEqual(badDate.errorType, 'VALIDATION_ERROR');
+    });
+  });
 });

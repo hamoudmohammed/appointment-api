@@ -92,3 +92,22 @@ export interface AvailableSlotsResult {
   availableSlots: string[];
   slots: SlotInfo[];
 }
+
+export interface AppointmentStatsFilter {
+  startDate?: string | undefined;
+  endDate?: string | undefined;
+}
+
+export interface AppointmentStatsResult {
+  range: {
+    startDate: string | null;
+    endDate: string | null;
+  };
+  totalAppointments: number;
+  byStatus: Record<AppointmentStatus, number>;
+  byServiceType: Record<AppointmentServiceType, number>;
+  cancellationRatePercent: number;
+  completionRatePercent: number;
+  busiestTimeSlots: Array<{ time: string; count: number }>;
+  busiestDates: Array<{ date: string; count: number }>;
+}

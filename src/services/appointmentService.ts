@@ -1,13 +1,16 @@
 import {
   Appointment,
   AppointmentStatus,
+  AppointmentServiceType,
   CreateAppointmentDTO,
   UpdateAppointmentDTO,
   ServiceResult,
   AppointmentQueryFilter,
   PaginatedAppointmentsResult,
   AvailableSlotsResult,
-  SlotInfo
+  SlotInfo,
+  AppointmentStatsFilter,
+  AppointmentStatsResult
 } from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
 import { InMemoryAppointmentRepository } from '../repositories/inMemoryAppointmentRepository.js';
@@ -124,6 +127,101 @@ export class AppointmentService {
         bookedCount,
         availableSlots,
         slots
+      }
+    };
+  }
+
+  public async getStats(filter?: AppointmentStatsFilter): Promise<ServiceResult<AppointmentStatsResult>> {
+    if (filter?.startDate !== undefined && !AppointmentService.isValidCalendarDate(filter.startDate)) {
+      return {
+        success: false,
+        error: 'Query parameter "startDate" must be a valid calendar date in YYYY-MM-DD format.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (filter?.endDate !== undefined && !AppointmentService.isValidCalendarDate(filter.endDate)) {
+      return {
+        success: false,
+        error: 'Query parameter "endDate" must be a valid calendar date in YYYY-MM-DD format.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (filter?.startDate && filter?.endDate && filter.startDate > filter.endDate) {
+      return {
+        success: false,
+        error: '"startDate" cannot be after "endDate".',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const { items } = await this.repository.findAll({
+      startDate: filter?.startDate,
+      endDate: filter?.endDate,
+      page: 1,
+      limit: 10000
+    });
+
+    const byStatus: Record<AppointmentStatus, number> = {
+      PENDING: 0,
+      CONFIRMED: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+      NO_SHOW: 0
+    };
+
+    const byServiceType: Record<AppointmentServiceType, number> = {
+      CONSULTATION: 0,
+      CHECKUP: 0,
+      TREATMENT: 0,
+      FOLLOW_UP: 0
+    };
+
+    const timeSlotCounts = new Map<string, number>();
+    const dateCounts = new Map<string, number>();
+
+    for (const item of items) {
+      byStatus[item.status] = (byStatus[item.status] ?? 0) + 1;
+      byServiceType[item.serviceType] = (byServiceType[item.serviceType] ?? 0) + 1;
+      timeSlotCounts.set(item.time, (timeSlotCounts.get(item.time) ?? 0) + 1);
+      dateCounts.set(item.date, (dateCounts.get(item.date) ?? 0) + 1);
+    }
+
+    const totalAppointments = items.length;
+    const cancellationRatePercent =
+      totalAppointments === 0
+        ? 0
+        : Number(((byStatus.CANCELLED / totalAppointments) * 100).toFixed(2));
+    const completionRatePercent =
+      totalAppointments === 0
+        ? 0
+        : Number(((byStatus.COMPLETED / totalAppointments) * 100).toFixed(2));
+
+    const busiestTimeSlots = Array.from(timeSlotCounts.entries())
+      .map(([time, count]) => ({ time, count }))
+      .sort((a, b) => b.count - a.count || a.time.localeCompare(b.time))
+      .slice(0, 5);
+
+    const busiestDates = Array.from(dateCounts.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => b.count - a.count || a.date.localeCompare(b.date))
+      .slice(0, 5);
+
+    return {
+      success: true,
+      data: {
+        range: {
+          startDate: filter?.startDate ?? null,
+          endDate: filter?.endDate ?? null
+        },
+        totalAppointments,
+        byStatus,
+        byServiceType,
+        cancellationRatePercent,
+        completionRatePercent,
+        busiestTimeSlots,
+        busiestDates
       }
     };
   }

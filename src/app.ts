@@ -323,6 +323,19 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
+    // GET /appointments/stats
+    if (method === 'GET' && pathname === '/appointments/stats') {
+      const startDate = url.searchParams.get('startDate') ?? undefined;
+      const endDate = url.searchParams.get('endDate') ?? undefined;
+      const result = await currentService.getStats({ startDate, endDate });
+      if (!result.success) {
+        sendJson(res, 400, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, result.data);
+      return;
+    }
+
     // Quick action routes (/appointments/:id/cancel, /appointments/:id/complete)
     const cancelMatch = pathname.match(/^\/appointments\/(\d+)\/cancel$/);
     if (method === 'POST' && cancelMatch) {

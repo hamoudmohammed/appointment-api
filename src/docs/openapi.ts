@@ -372,6 +372,98 @@ export const openApiSpec = {
         }
       }
     },
+    '/appointments/stats': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'Get appointment analytics and statistics',
+        description: 'Returns aggregated counts by status and service type, cancellation/completion rates, and busiest dates/time slots. Optionally filterable by date range.',
+        parameters: [
+          {
+            name: 'startDate',
+            in: 'query',
+            description: 'Start date inclusive (YYYY-MM-DD)',
+            schema: { type: 'string', format: 'date', example: '2026-11-01' }
+          },
+          {
+            name: 'endDate',
+            in: 'query',
+            description: 'End date inclusive (YYYY-MM-DD)',
+            schema: { type: 'string', format: 'date', example: '2026-11-30' }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Aggregated appointment statistics',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    range: {
+                      type: 'object',
+                      properties: {
+                        startDate: { type: 'string', nullable: true, example: '2026-11-01' },
+                        endDate: { type: 'string', nullable: true, example: '2026-11-30' }
+                      }
+                    },
+                    totalAppointments: { type: 'integer', example: 12 },
+                    byStatus: {
+                      type: 'object',
+                      properties: {
+                        PENDING: { type: 'integer', example: 1 },
+                        CONFIRMED: { type: 'integer', example: 6 },
+                        COMPLETED: { type: 'integer', example: 3 },
+                        CANCELLED: { type: 'integer', example: 2 },
+                        NO_SHOW: { type: 'integer', example: 0 }
+                      }
+                    },
+                    byServiceType: {
+                      type: 'object',
+                      properties: {
+                        CONSULTATION: { type: 'integer', example: 5 },
+                        CHECKUP: { type: 'integer', example: 3 },
+                        TREATMENT: { type: 'integer', example: 2 },
+                        FOLLOW_UP: { type: 'integer', example: 2 }
+                      }
+                    },
+                    cancellationRatePercent: { type: 'number', example: 16.67 },
+                    completionRatePercent: { type: 'number', example: 25 },
+                    busiestTimeSlots: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          time: { type: 'string', example: '10:00' },
+                          count: { type: 'integer', example: 4 }
+                        }
+                      }
+                    },
+                    busiestDates: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          date: { type: 'string', example: '2026-11-20' },
+                          count: { type: 'integer', example: 3 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Invalid date range parameters',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
     '/appointments/{id}': {
       get: {
         tags: ['Appointments'],
