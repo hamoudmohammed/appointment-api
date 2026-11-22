@@ -1,3 +1,5 @@
+export const DEFAULT_PROVIDER = 'General';
+
 export type AppointmentStatus =
   | 'PENDING'
   | 'CONFIRMED'
@@ -16,6 +18,7 @@ export interface Appointment {
   customer: string;
   email?: string | undefined;
   phone?: string | undefined;
+  provider: string;
   serviceType: AppointmentServiceType;
   notes?: string | undefined;
   date: string; // ISO date format: YYYY-MM-DD
@@ -28,6 +31,7 @@ export interface CreateAppointmentDTO {
   customer: string;
   email?: string | undefined;
   phone?: string | undefined;
+  provider?: string | undefined;
   serviceType?: AppointmentServiceType | undefined;
   notes?: string | undefined;
   date: string;
@@ -38,6 +42,7 @@ export interface UpdateAppointmentDTO {
   customer?: string | undefined;
   email?: string | undefined;
   phone?: string | undefined;
+  provider?: string | undefined;
   serviceType?: AppointmentServiceType | undefined;
   notes?: string | undefined;
   date?: string | undefined;
@@ -61,6 +66,7 @@ export interface AppointmentQueryFilter {
   status?: AppointmentStatus | undefined;
   customer?: string | undefined;
   email?: string | undefined;
+  provider?: string | undefined;
   serviceType?: AppointmentServiceType | undefined;
   page?: number | undefined;
   limit?: number | undefined;

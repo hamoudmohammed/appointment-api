@@ -245,6 +245,43 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(errData.errorType, 'VALIDATION_ERROR');
   });
 
+  test('POST & GET /appointments support multi-provider booking and filtering', async () => {
+    // Same slot as seed (2026-11-20 10:00) but different provider succeeds
+    const res1 = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Multi Provider Client',
+        provider: 'Dr. Schmidt',
+        date: '2026-11-20',
+        time: '10:00'
+      })
+    });
+    const data1 = await res1.json();
+    assert.strictEqual(res1.status, 201);
+    assert.strictEqual(data1.data.provider, 'Dr. Schmidt');
+
+    // Same slot + same provider -> 409 Conflict
+    const res2 = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Conflicting Client',
+        provider: 'Dr. Schmidt',
+        date: '2026-11-20',
+        time: '10:00'
+      })
+    });
+    assert.strictEqual(res2.status, 409);
+
+    // Filter by provider
+    const listRes = await fetch(`${baseUrl}/appointments?provider=schmidt`);
+    const listData = await listRes.json();
+    assert.strictEqual(listRes.status, 200);
+    assert.strictEqual(listData.total, 1);
+    assert.strictEqual(listData.data[0].provider, 'Dr. Schmidt');
+  });
+
   test('POST /appointments creates an appointment with 201', async () => {
     const res = await fetch(`${baseUrl}/appointments`, {
       method: 'POST',

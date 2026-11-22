@@ -262,6 +262,7 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         status: (url.searchParams.get('status') as AppointmentStatus) ?? undefined,
         customer: url.searchParams.get('customer') ?? undefined,
         email: url.searchParams.get('email') ?? undefined,
+        provider: url.searchParams.get('provider') ?? undefined,
         serviceType: (url.searchParams.get('serviceType') as AppointmentServiceType) ?? undefined,
         limit: 100
       };
@@ -307,6 +308,7 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         status: (url.searchParams.get('status') as AppointmentStatus) ?? undefined,
         customer: url.searchParams.get('customer') ?? undefined,
         email: url.searchParams.get('email') ?? undefined,
+        provider: url.searchParams.get('provider') ?? undefined,
         serviceType: (url.searchParams.get('serviceType') as AppointmentServiceType) ?? undefined,
         page,
         limit

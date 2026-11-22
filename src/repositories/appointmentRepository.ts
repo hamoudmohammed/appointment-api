@@ -9,6 +9,7 @@ export interface CreateAppointmentRecord {
   customer: string;
   email?: string | undefined;
   phone?: string | undefined;
+  provider?: string | undefined;
   serviceType?: AppointmentServiceType | undefined;
   notes?: string | undefined;
   date: string;
@@ -20,6 +21,7 @@ export interface UpdateAppointmentRecord {
   customer?: string | undefined;
   email?: string | undefined;
   phone?: string | undefined;
+  provider?: string | undefined;
   serviceType?: AppointmentServiceType | undefined;
   notes?: string | undefined;
   date?: string | undefined;
@@ -35,7 +37,12 @@ export interface RepositoryFindAllResult {
 export interface IAppointmentRepository {
   findAll(filter?: AppointmentQueryFilter): Promise<RepositoryFindAllResult>;
   findById(id: number): Promise<Appointment | undefined>;
-  findConfirmedBySlot(date: string, time: string, excludeId?: number | undefined): Promise<Appointment | undefined>;
+  findConfirmedBySlot(
+    date: string,
+    time: string,
+    excludeId?: number | undefined,
+    provider?: string | undefined
+  ): Promise<Appointment | undefined>;
   create(record: CreateAppointmentRecord): Promise<Appointment>;
   update(id: number, record: UpdateAppointmentRecord): Promise<Appointment | undefined>;
   delete(id: number): Promise<Appointment | undefined>;

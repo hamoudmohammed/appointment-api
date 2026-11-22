@@ -79,6 +79,38 @@ describe('AppointmentService', () => {
     assert.match(duplicate.error || '', /already booked/i);
   });
 
+  test('create() allows booking the same date/time for different providers and prevents conflict per provider', async () => {
+    // Seed appointment is on 2026-11-20 at 10:00 for provider "General"
+    const drWeber = await service.create({
+      customer: 'Patient A',
+      provider: 'Dr. Weber',
+      date: '2026-11-20',
+      time: '10:00'
+    });
+    assert.strictEqual(drWeber.success, true);
+    assert.strictEqual(drWeber.data?.provider, 'Dr. Weber');
+
+    // Same slot for same provider (case-insensitive) must conflict
+    const conflict = await service.create({
+      customer: 'Patient B',
+      provider: 'dr. weber',
+      date: '2026-11-20',
+      time: '10:00'
+    });
+    assert.strictEqual(conflict.success, false);
+    assert.strictEqual(conflict.errorType, 'CONFLICT');
+
+    // Empty provider is rejected
+    const badProvider = await service.create({
+      customer: 'Patient C',
+      provider: '   ',
+      date: '2026-11-20',
+      time: '11:00'
+    });
+    assert.strictEqual(badProvider.success, false);
+    assert.strictEqual(badProvider.errorType, 'VALIDATION_ERROR');
+  });
+
   test('create() rejects appointment with empty customer name', async () => {
     const result = await service.create({
       customer: '   ',

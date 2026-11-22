@@ -220,6 +220,12 @@ export const openApiSpec = {
             in: 'query',
             description: 'Case-insensitive filter by customer name',
             schema: { type: 'string', example: 'Max' }
+          },
+          {
+            name: 'provider',
+            in: 'query',
+            description: 'Case-insensitive filter by provider / staff member name',
+            schema: { type: 'string', example: 'Dr. Weber' }
           }
         ],
         responses: {
@@ -756,12 +762,13 @@ export const openApiSpec = {
     schemas: {
       Appointment: {
         type: 'object',
-        required: ['id', 'customer', 'date', 'time', 'status', 'createdAt'],
+        required: ['id', 'customer', 'provider', 'date', 'time', 'status', 'createdAt'],
         properties: {
           id: { type: 'integer', example: 1 },
           customer: { type: 'string', example: 'Max Mustermann' },
           email: { type: 'string', format: 'email', example: 'max@example.com' },
           phone: { type: 'string', example: '+49 151 12345678' },
+          provider: { type: 'string', example: 'General', description: 'Assigned staff member or provider' },
           serviceType: {
             type: 'string',
             enum: ['CONSULTATION', 'CHECKUP', 'TREATMENT', 'FOLLOW_UP'],
@@ -785,6 +792,7 @@ export const openApiSpec = {
           customer: { type: 'string', example: 'Sarah Connor' },
           email: { type: 'string', format: 'email', example: 'sarah@example.com' },
           phone: { type: 'string', example: '+1 555 0199' },
+          provider: { type: 'string', example: 'Dr. Weber', description: 'Optional provider name (defaults to "General")' },
           serviceType: {
             type: 'string',
             enum: ['CONSULTATION', 'CHECKUP', 'TREATMENT', 'FOLLOW_UP'],
@@ -801,6 +809,7 @@ export const openApiSpec = {
           customer: { type: 'string', example: 'Sarah Connor Updated' },
           email: { type: 'string', format: 'email', example: 'sarah.updated@example.com' },
           phone: { type: 'string', example: '+1 555 0199' },
+          provider: { type: 'string', example: 'Dr. Weber' },
           serviceType: {
             type: 'string',
             enum: ['CONSULTATION', 'CHECKUP', 'TREATMENT', 'FOLLOW_UP'],

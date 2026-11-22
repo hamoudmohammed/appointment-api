@@ -10,7 +10,8 @@ import {
   AvailableSlotsResult,
   SlotInfo,
   AppointmentStatsFilter,
-  AppointmentStatsResult
+  AppointmentStatsResult,
+  DEFAULT_PROVIDER
 } from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
 import { InMemoryAppointmentRepository } from '../repositories/inMemoryAppointmentRepository.js';
@@ -233,12 +234,13 @@ export class AppointmentService {
       return { success: false, error: validationError, errorType: 'VALIDATION_ERROR' };
     }
 
-    // 2. Domain Rule: Prevent double booking for the same slot
-    const slotTaken = await this.repository.findConfirmedBySlot(dto.date, dto.time);
+    // 2. Domain Rule: Prevent double booking for the same slot & provider
+    const provider = dto.provider ? dto.provider.trim() : DEFAULT_PROVIDER;
+    const slotTaken = await this.repository.findConfirmedBySlot(dto.date, dto.time, undefined, provider);
     if (slotTaken) {
       return {
         success: false,
-        error: `Time slot on ${dto.date} at ${dto.time} is already booked. Please choose another time.`,
+        error: `Time slot on ${dto.date} at ${dto.time} for provider "${provider}" is already booked. Please choose another time or provider.`,
         errorType: 'CONFLICT'
       };
     }
@@ -249,6 +251,7 @@ export class AppointmentService {
         customer: dto.customer.trim(),
         email: dto.email ? dto.email.trim() : undefined,
         phone: dto.phone ? dto.phone.trim() : undefined,
+        provider,
         serviceType: dto.serviceType || 'CONSULTATION',
         notes: dto.notes ? dto.notes.trim() : undefined,
         date: dto.date,
@@ -263,7 +266,7 @@ export class AppointmentService {
       if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
         return {
           success: false,
-          error: `Time slot on ${dto.date} at ${dto.time} is already booked. Please choose another time.`,
+          error: `Time slot on ${dto.date} at ${dto.time} for provider "${provider}" is already booked. Please choose another time or provider.`,
           errorType: 'CONFLICT'
         };
       }
@@ -315,14 +318,20 @@ export class AppointmentService {
     const targetDate = dto.date ?? current.date;
     const targetTime = dto.time ?? current.time;
     const targetStatus = dto.status ?? current.status;
+    const targetProvider = dto.provider !== undefined ? dto.provider.trim() : current.provider;
 
     // Check slot conflict if the status is CONFIRMED
     if (targetStatus === 'CONFIRMED') {
-      const slotTaken = await this.repository.findConfirmedBySlot(targetDate, targetTime, id);
+      const slotTaken = await this.repository.findConfirmedBySlot(
+        targetDate,
+        targetTime,
+        id,
+        targetProvider
+      );
       if (slotTaken) {
         return {
           success: false,
-          error: `Time slot on ${targetDate} at ${targetTime} is already booked. Please choose another time.`,
+          error: `Time slot on ${targetDate} at ${targetTime} for provider "${targetProvider}" is already booked. Please choose another time or provider.`,
           errorType: 'CONFLICT'
         };
       }
@@ -334,6 +343,7 @@ export class AppointmentService {
         customer: dto.customer !== undefined ? dto.customer.trim() : undefined,
         email: dto.email !== undefined ? dto.email.trim() : undefined,
         phone: dto.phone !== undefined ? dto.phone.trim() : undefined,
+        provider: dto.provider !== undefined ? dto.provider.trim() : undefined,
         serviceType: dto.serviceType,
         notes: dto.notes !== undefined ? dto.notes.trim() : undefined,
         date: dto.date,
@@ -506,6 +516,12 @@ export class AppointmentService {
       }
     }
 
+    if (dto.provider !== undefined && dto.provider !== null) {
+      if (typeof dto.provider !== 'string' || dto.provider.trim().length === 0 || dto.provider.trim().length > 100) {
+        return 'Field "provider" must be a non-empty string of at most 100 characters.';
+      }
+    }
+
     if (dto.serviceType !== undefined && dto.serviceType !== null) {
       if (!AppointmentService.ALLOWED_SERVICE_TYPES.includes(dto.serviceType)) {
         return `Field "serviceType" must be one of: ${AppointmentService.ALLOWED_SERVICE_TYPES.join(', ')}.`;
@@ -535,6 +551,7 @@ export class AppointmentService {
       dto.customer === undefined &&
       dto.email === undefined &&
       dto.phone === undefined &&
+      dto.provider === undefined &&
       dto.serviceType === undefined &&
       dto.notes === undefined &&
       dto.date === undefined &&
@@ -559,6 +576,12 @@ export class AppointmentService {
     if (dto.phone !== undefined && dto.phone !== null) {
       if (typeof dto.phone !== 'string' || dto.phone.trim().length < 5) {
         return 'Field "phone" must be at least 5 characters long.';
+      }
+    }
+
+    if (dto.provider !== undefined && dto.provider !== null) {
+      if (typeof dto.provider !== 'string' || dto.provider.trim().length === 0 || dto.provider.trim().length > 100) {
+        return 'Field "provider" must be a non-empty string of at most 100 characters.';
       }
     }
 
