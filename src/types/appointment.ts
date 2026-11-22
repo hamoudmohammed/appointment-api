@@ -87,6 +87,7 @@ export interface SlotInfo {
 
 export interface AvailableSlotsResult {
   date: string;
+  provider: string;
   businessHours: {
     start: string;
     end: string;
@@ -102,6 +103,7 @@ export interface AvailableSlotsResult {
 export interface AppointmentStatsFilter {
   startDate?: string | undefined;
   endDate?: string | undefined;
+  provider?: string | undefined;
 }
 
 export interface AppointmentStatsResult {
@@ -112,6 +114,7 @@ export interface AppointmentStatsResult {
   totalAppointments: number;
   byStatus: Record<AppointmentStatus, number>;
   byServiceType: Record<AppointmentServiceType, number>;
+  byProvider: Record<string, number>;
   cancellationRatePercent: number;
   completionRatePercent: number;
   busiestTimeSlots: Array<{ time: string; count: number }>;

@@ -334,17 +334,25 @@ export const openApiSpec = {
             required: true,
             description: 'Date to inspect for available slots (YYYY-MM-DD)',
             schema: { type: 'string', format: 'date', example: '2026-11-20' }
+          },
+          {
+            name: 'provider',
+            in: 'query',
+            required: false,
+            description: 'Optional provider name to check availability for (defaults to "General")',
+            schema: { type: 'string', example: 'Dr. Weber' }
           }
         ],
         responses: {
           '200': {
-            description: 'Available slots breakdown for the specified date',
+            description: 'Available slots breakdown for the specified date and provider',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
                     date: { type: 'string', example: '2026-11-20' },
+                    provider: { type: 'string', example: 'General' },
                     businessHours: {
                       type: 'object',
                       properties: {
@@ -404,6 +412,12 @@ export const openApiSpec = {
             in: 'query',
             description: 'End date inclusive (YYYY-MM-DD)',
             schema: { type: 'string', format: 'date', example: '2026-11-30' }
+          },
+          {
+            name: 'provider',
+            in: 'query',
+            description: 'Optional case-insensitive provider filter',
+            schema: { type: 'string', example: 'Dr. Weber' }
           }
         ],
         responses: {
@@ -440,6 +454,11 @@ export const openApiSpec = {
                         TREATMENT: { type: 'integer', example: 2 },
                         FOLLOW_UP: { type: 'integer', example: 2 }
                       }
+                    },
+                    byProvider: {
+                      type: 'object',
+                      additionalProperties: { type: 'integer' },
+                      example: { General: 6, 'Dr. Weber': 4, 'Dr. Schmidt': 2 }
                     },
                     cancellationRatePercent: { type: 'number', example: 16.67 },
                     completionRatePercent: { type: 'number', example: 25 },

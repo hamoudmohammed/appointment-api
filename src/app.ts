@@ -326,7 +326,8 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     // GET /appointments/slots
     if (method === 'GET' && pathname === '/appointments/slots') {
       const dateParam = url.searchParams.get('date') ?? undefined;
-      const result = await currentService.getAvailableSlots(dateParam);
+      const providerParam = url.searchParams.get('provider') ?? undefined;
+      const result = await currentService.getAvailableSlots(dateParam, providerParam);
       if (!result.success) {
         sendJson(res, 400, { error: result.error, errorType: result.errorType });
         return;
@@ -339,7 +340,8 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     if (method === 'GET' && pathname === '/appointments/stats') {
       const startDate = url.searchParams.get('startDate') ?? undefined;
       const endDate = url.searchParams.get('endDate') ?? undefined;
-      const result = await currentService.getStats({ startDate, endDate });
+      const provider = url.searchParams.get('provider') ?? undefined;
+      const result = await currentService.getStats({ startDate, endDate, provider });
       if (!result.success) {
         sendJson(res, 400, { error: result.error, errorType: result.errorType });
         return;

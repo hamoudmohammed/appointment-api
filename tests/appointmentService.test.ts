@@ -417,6 +417,28 @@ describe('AppointmentService', () => {
       assert.strictEqual(res.data?.bookedCount, 0);
       assert.strictEqual(res.data?.availableSlots.includes('10:00'), true);
     });
+
+    test('calculates slot availability independently per provider', async () => {
+      // Seed occupies 10:00 for "General", so "Dr. Weber" still has 10:00 free
+      const beforeBooking = await service.getAvailableSlots('2026-11-20', 'Dr. Weber');
+      assert.strictEqual(beforeBooking.success, true);
+      assert.strictEqual(beforeBooking.data?.provider, 'Dr. Weber');
+      assert.strictEqual(beforeBooking.data?.bookedCount, 0);
+      assert.strictEqual(beforeBooking.data?.availableSlots.includes('10:00'), true);
+
+      await service.create({
+        customer: 'Weber Patient',
+        provider: 'Dr. Weber',
+        date: '2026-11-20',
+        time: '14:00'
+      });
+
+      const afterBooking = await service.getAvailableSlots('2026-11-20', 'Dr. Weber');
+      assert.strictEqual(afterBooking.success, true);
+      assert.strictEqual(afterBooking.data?.bookedCount, 1);
+      assert.strictEqual(afterBooking.data?.availableSlots.includes('14:00'), false);
+      assert.strictEqual(afterBooking.data?.availableSlots.includes('10:00'), true);
+    });
   });
 
   describe('getStats()', () => {
@@ -480,6 +502,31 @@ describe('AppointmentService', () => {
       const badDate = await service.getStats({ startDate: '2026-02-31' });
       assert.strictEqual(badDate.success, false);
       assert.strictEqual(badDate.errorType, 'VALIDATION_ERROR');
+    });
+
+    test('includes byProvider breakdown and supports provider filter', async () => {
+      await service.create({
+        customer: 'Patient 1',
+        provider: 'Dr. Weber',
+        date: '2026-11-20',
+        time: '11:00'
+      });
+      await service.create({
+        customer: 'Patient 2',
+        provider: 'Dr. Weber',
+        date: '2026-11-20',
+        time: '12:00'
+      });
+
+      const allStats = await service.getStats();
+      assert.strictEqual(allStats.success, true);
+      assert.strictEqual(allStats.data?.byProvider['General'], 1);
+      assert.strictEqual(allStats.data?.byProvider['Dr. Weber'], 2);
+
+      const weberStats = await service.getStats({ provider: 'Dr. Weber' });
+      assert.strictEqual(weberStats.success, true);
+      assert.strictEqual(weberStats.data?.totalAppointments, 2);
+      assert.strictEqual(weberStats.data?.byProvider['Dr. Weber'], 2);
     });
   });
 });

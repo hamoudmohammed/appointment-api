@@ -25,11 +25,11 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
   - `app.ts`: HTTP request dispatcher, payload size security limits, and standardized JSON responses.
   - `server.ts`: Server bootstrapping, dependency injection, environment port binding, and graceful shutdown handling (`SIGTERM`/`SIGINT`).
 - **Resilience & Concurrency Safety:** 
-  - **Zero Race Conditions:** Double-booking prevention is enforced both in the application domain layer and at the database engine level using a conditional unique index:
+  - **Zero Race Conditions & Multi-Provider Isolation:** Double-booking prevention per provider is enforced both in the application domain layer and at the database engine level using a conditional unique index:
     ```sql
-    CREATE UNIQUE INDEX idx_unique_confirmed_slot ON appointments (date, time) WHERE status = 'CONFIRMED';
+    CREATE UNIQUE INDEX idx_unique_confirmed_slot ON appointments (date, time, LOWER(provider)) WHERE status = 'CONFIRMED';
     ```
-    Cancelled appointments automatically liberate the time slot.
+    Cancelled appointments automatically liberate the time slot, while distinct providers can be booked concurrently at the same time.
   - **Lifecycle State Machine:** Supports `PENDING`, `CONFIRMED`, `COMPLETED`, `CANCELLED`, `NO_SHOW` with transition guards blocking modifications to cancelled or completed appointments.
   - **Idempotent Retries:** `POST /appointments` supports an optional `Idempotency-Key` header with SHA-256 payload fingerprinting (`Idempotency-Replayed: true` on safe replay, `409 IDEMPOTENCY_CONFLICT` on payload mismatch).
   - Strict payload size limit (1 MB max) to prevent memory exhaustion / DoS attacks.
@@ -51,9 +51,9 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/health` / `/health/live` | Liveness probe (uptime & memory metrics) | `200` |
 | `GET` | `/health/ready` | Database readiness probe (active ping & pool statistics) | `200`, `503` |
 | `GET` | `/metrics` | Prometheus metrics for cloud monitoring and Grafana scraping | `200` |
-| `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`, `serviceType`, `email`) | `200`, `400` |
-| `GET` | `/appointments/slots` | Discover available and booked time slots for a given date | `200`, `400` |
-| `GET` | `/appointments/stats` | Aggregated appointment analytics (counts by status/service, rates, busiest slots/dates) | `200`, `400` |
+| `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`, `provider`, `serviceType`, `email`) | `200`, `400` |
+| `GET` | `/appointments/slots` | Discover available and booked time slots for a given date & optional `provider` | `200`, `400` |
+| `GET` | `/appointments/stats` | Aggregated appointment analytics (counts by status/service/provider, rates, busiest slots/dates) | `200`, `400` |
 | `GET` | `/appointments/export` | Export appointments schedule in CSV or iCalendar (`.ics`) format | `200`, `400` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
 | `GET` | `/appointments/:id/export` | Download iCalendar invite (`.ics`) or CSV for a single appointment | `200`, `404` |

@@ -82,7 +82,7 @@ export class AppointmentService {
     return slots;
   }
 
-  public async getAvailableSlots(date?: string): Promise<ServiceResult<AvailableSlotsResult>> {
+  public async getAvailableSlots(date?: string, provider?: string): Promise<ServiceResult<AvailableSlotsResult>> {
     if (!date) {
       return {
         success: false,
@@ -99,13 +99,28 @@ export class AppointmentService {
       };
     }
 
+    const targetProvider = provider !== undefined ? provider.trim() : DEFAULT_PROVIDER;
+    if (targetProvider.length === 0 || targetProvider.length > 100) {
+      return {
+        success: false,
+        error: 'Query parameter "provider" must be a non-empty string of at most 100 characters.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
     const { items } = await this.repository.findAll({
       date,
       status: 'CONFIRMED',
+      provider: targetProvider,
       limit: 100
     });
 
-    const bookedSet = new Set(items.map((item) => item.time));
+    const normalizedProvider = targetProvider.toLowerCase();
+    const bookedSet = new Set(
+      items
+        .filter((item) => item.provider.toLowerCase() === normalizedProvider)
+        .map((item) => item.time)
+    );
     const allSlots = this.generateDailySlots();
 
     const slots: SlotInfo[] = allSlots.map((time) => ({
@@ -122,6 +137,7 @@ export class AppointmentService {
       success: true,
       data: {
         date,
+        provider: targetProvider,
         businessHours: AppointmentService.BUSINESS_HOURS,
         totalSlots,
         availableCount,
@@ -160,6 +176,7 @@ export class AppointmentService {
     const { items } = await this.repository.findAll({
       startDate: filter?.startDate,
       endDate: filter?.endDate,
+      provider: filter?.provider,
       page: 1,
       limit: 10000
     });
@@ -179,12 +196,14 @@ export class AppointmentService {
       FOLLOW_UP: 0
     };
 
+    const byProvider: Record<string, number> = {};
     const timeSlotCounts = new Map<string, number>();
     const dateCounts = new Map<string, number>();
 
     for (const item of items) {
       byStatus[item.status] = (byStatus[item.status] ?? 0) + 1;
       byServiceType[item.serviceType] = (byServiceType[item.serviceType] ?? 0) + 1;
+      byProvider[item.provider] = (byProvider[item.provider] ?? 0) + 1;
       timeSlotCounts.set(item.time, (timeSlotCounts.get(item.time) ?? 0) + 1);
       dateCounts.set(item.date, (dateCounts.get(item.date) ?? 0) + 1);
     }
@@ -219,6 +238,7 @@ export class AppointmentService {
         totalAppointments,
         byStatus,
         byServiceType,
+        byProvider,
         cancellationRatePercent,
         completionRatePercent,
         busiestTimeSlots,

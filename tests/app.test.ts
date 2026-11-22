@@ -219,6 +219,33 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(invalidRes.status, 400);
   });
 
+  test('GET /appointments/slots and /appointments/stats support provider query param', async () => {
+    await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Weber Client',
+        provider: 'Dr. Weber',
+        date: '2026-11-20',
+        time: '15:00'
+      })
+    });
+
+    const slotsRes = await fetch(`${baseUrl}/appointments/slots?date=2026-11-20&provider=Dr.%20Weber`);
+    const slotsData = await slotsRes.json();
+    assert.strictEqual(slotsRes.status, 200);
+    assert.strictEqual(slotsData.provider, 'Dr. Weber');
+    assert.strictEqual(slotsData.bookedCount, 1);
+    assert.strictEqual(slotsData.availableSlots.includes('10:00'), true);
+    assert.strictEqual(slotsData.availableSlots.includes('15:00'), false);
+
+    const statsRes = await fetch(`${baseUrl}/appointments/stats?provider=Dr.%20Weber`);
+    const statsData = await statsRes.json();
+    assert.strictEqual(statsRes.status, 200);
+    assert.strictEqual(statsData.totalAppointments, 1);
+    assert.strictEqual(statsData.byProvider['Dr. Weber'], 1);
+  });
+
   test('GET /appointments supports filtering and pagination query params', async () => {
     // Create an appointment for 2026-12-10
     await fetch(`${baseUrl}/appointments`, {

@@ -66,6 +66,7 @@ export async function initializeDatabase(pool: pg.Pool): Promise<void> {
         customer VARCHAR(255) NOT NULL,
         email VARCHAR(255),
         phone VARCHAR(50),
+        provider VARCHAR(100) NOT NULL DEFAULT 'General',
         service_type VARCHAR(50) NOT NULL DEFAULT 'CONSULTATION',
         notes TEXT,
         date DATE NOT NULL,
@@ -76,6 +77,7 @@ export async function initializeDatabase(pool: pg.Pool): Promise<void> {
 
       ALTER TABLE appointments ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE appointments ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+      ALTER TABLE appointments ADD COLUMN IF NOT EXISTS provider VARCHAR(100) NOT NULL DEFAULT 'General';
       ALTER TABLE appointments ADD COLUMN IF NOT EXISTS service_type VARCHAR(50) NOT NULL DEFAULT 'CONSULTATION';
       ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT;
 
@@ -89,9 +91,11 @@ export async function initializeDatabase(pool: pg.Pool): Promise<void> {
 
       CREATE INDEX IF NOT EXISTS idx_appointments_date_status ON appointments (date, status);
       CREATE INDEX IF NOT EXISTS idx_appointments_service_type ON appointments (service_type);
+      CREATE INDEX IF NOT EXISTS idx_appointments_provider ON appointments (LOWER(provider));
 
+      DROP INDEX IF EXISTS idx_unique_confirmed_slot;
       CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_confirmed_slot 
-      ON appointments (date, time) 
+      ON appointments (date, time, LOWER(provider)) 
       WHERE status = 'CONFIRMED';
     `);
 
@@ -99,8 +103,8 @@ export async function initializeDatabase(pool: pg.Pool): Promise<void> {
     const countRes = await client.query('SELECT COUNT(*) FROM appointments');
     if (parseInt(countRes.rows[0].count, 10) === 0) {
       await client.query(`
-        INSERT INTO appointments (customer, email, phone, service_type, notes, date, time, status, created_at)
-        VALUES ('Max Mustermann', 'max@example.com', '+49 151 12345678', 'CONSULTATION', 'Initial consultation session', '2026-11-20', '10:00', 'CONFIRMED', '2026-11-14 10:00:00+00')
+        INSERT INTO appointments (customer, email, phone, provider, service_type, notes, date, time, status, created_at)
+        VALUES ('Max Mustermann', 'max@example.com', '+49 151 12345678', 'General', 'CONSULTATION', 'Initial consultation session', '2026-11-20', '10:00', 'CONFIRMED', '2026-11-14 10:00:00+00')
       `);
       console.log('[db] Initial seed appointment inserted.');
     }
