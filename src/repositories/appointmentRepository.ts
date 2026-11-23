@@ -2,8 +2,17 @@ import {
   Appointment,
   AppointmentStatus,
   AppointmentServiceType,
-  AppointmentQueryFilter
+  AppointmentQueryFilter,
+  AppointmentHistoryAction,
+  AppointmentHistoryEntry
 } from '../types/appointment.js';
+
+export interface CreateHistoryRecord {
+  appointmentId: number;
+  action: AppointmentHistoryAction;
+  previousValues?: Record<string, unknown> | undefined;
+  newValues?: Record<string, unknown> | undefined;
+}
 
 export interface CreateAppointmentRecord {
   customer: string;
@@ -46,4 +55,6 @@ export interface IAppointmentRepository {
   create(record: CreateAppointmentRecord): Promise<Appointment>;
   update(id: number, record: UpdateAppointmentRecord): Promise<Appointment | undefined>;
   delete(id: number): Promise<Appointment | undefined>;
+  addHistory(record: CreateHistoryRecord): Promise<AppointmentHistoryEntry>;
+  findHistoryByAppointmentId(appointmentId: number): Promise<AppointmentHistoryEntry[]>;
 }

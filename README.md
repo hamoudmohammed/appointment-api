@@ -56,6 +56,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/appointments/stats` | Aggregated appointment analytics (counts by status/service/provider, rates, busiest slots/dates) | `200`, `400` |
 | `GET` | `/appointments/export` | Export appointments schedule in CSV or iCalendar (`.ics`) format | `200`, `400` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |
+| `GET` | `/appointments/:id/history` | Retrieve chronological audit log of appointment lifecycle changes | `200`, `404` |
 | `GET` | `/appointments/:id/export` | Download iCalendar invite (`.ics`) or CSV for a single appointment | `200`, `404` |
 | `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |
 | `POST` | `/appointments/:id/cancel` | Quick action to cancel an appointment and free its time slot | `200`, `400`, `404` |

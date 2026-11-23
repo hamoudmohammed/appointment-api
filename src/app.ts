@@ -377,6 +377,23 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
+    // Appointment audit history (/appointments/:id/history)
+    const historyMatch = pathname.match(/^\/appointments\/(\d+)\/history$/);
+    if (method === 'GET' && historyMatch) {
+      const id = parseInt(historyMatch[1], 10);
+      const result = await currentService.getHistory(id);
+      if (!result.success) {
+        sendJson(res, 404, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, {
+        appointmentId: id,
+        total: result.data!.length,
+        data: result.data
+      });
+      return;
+    }
+
     // Single appointment export (/appointments/:id/export)
     const singleExportMatch = pathname.match(/^\/appointments\/(\d+)\/export$/);
     if (method === 'GET' && singleExportMatch) {

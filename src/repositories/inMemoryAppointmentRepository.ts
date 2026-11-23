@@ -1,14 +1,22 @@
-import { Appointment, AppointmentQueryFilter, DEFAULT_PROVIDER } from '../types/appointment.js';
+import {
+  Appointment,
+  AppointmentQueryFilter,
+  AppointmentHistoryEntry,
+  DEFAULT_PROVIDER
+} from '../types/appointment.js';
 import {
   IAppointmentRepository,
   CreateAppointmentRecord,
   UpdateAppointmentRecord,
+  CreateHistoryRecord,
   RepositoryFindAllResult
 } from './appointmentRepository.js';
 
 export class InMemoryAppointmentRepository implements IAppointmentRepository {
   private appointments: Appointment[] = [];
+  private history: AppointmentHistoryEntry[] = [];
   private nextId = 1;
+  private nextHistoryId = 1;
 
   constructor(initialData?: Appointment[]) {
     if (initialData) {
@@ -31,6 +39,23 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
         }
       ];
       this.nextId = 2;
+    }
+
+    for (const appt of this.appointments) {
+      this.history.push({
+        id: this.nextHistoryId++,
+        appointmentId: appt.id,
+        action: 'CREATED',
+        newValues: {
+          customer: appt.customer,
+          provider: appt.provider,
+          serviceType: appt.serviceType,
+          date: appt.date,
+          time: appt.time,
+          status: appt.status
+        },
+        timestamp: appt.createdAt
+      });
     }
   }
 
@@ -156,6 +181,26 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
     }
 
     const [deleted] = this.appointments.splice(index, 1);
+    this.history = this.history.filter((entry) => entry.appointmentId !== id);
     return deleted;
+  }
+
+  public async addHistory(record: CreateHistoryRecord): Promise<AppointmentHistoryEntry> {
+    const entry: AppointmentHistoryEntry = {
+      id: this.nextHistoryId++,
+      appointmentId: record.appointmentId,
+      action: record.action,
+      previousValues: record.previousValues,
+      newValues: record.newValues,
+      timestamp: new Date().toISOString()
+    };
+    this.history.push(entry);
+    return entry;
+  }
+
+  public async findHistoryByAppointmentId(appointmentId: number): Promise<AppointmentHistoryEntry[]> {
+    return this.history
+      .filter((entry) => entry.appointmentId === appointmentId)
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp) || a.id - b.id);
   }
 }

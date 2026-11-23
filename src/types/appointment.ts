@@ -120,3 +120,20 @@ export interface AppointmentStatsResult {
   busiestTimeSlots: Array<{ time: string; count: number }>;
   busiestDates: Array<{ date: string; count: number }>;
 }
+
+export type AppointmentHistoryAction =
+  | 'CREATED'
+  | 'UPDATED'
+  | 'RESCHEDULED'
+  | 'CANCELLED'
+  | 'COMPLETED'
+  | 'NO_SHOW';
+
+export interface AppointmentHistoryEntry {
+  id: number;
+  appointmentId: number;
+  action: AppointmentHistoryAction;
+  previousValues?: Record<string, unknown> | undefined;
+  newValues?: Record<string, unknown> | undefined;
+  timestamp: string;
+}

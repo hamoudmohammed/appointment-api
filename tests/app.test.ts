@@ -466,6 +466,28 @@ describe('HTTP API Endpoints', () => {
     assert.match(data.message, /completed successfully/i);
   });
 
+  test('GET /appointments/:id/history returns chronological audit trail and 404 for unknown ID', async () => {
+    await fetch(`${baseUrl}/appointments/1`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: '2026-11-28', time: '14:00' })
+    });
+    await fetch(`${baseUrl}/appointments/1/complete`, { method: 'POST' });
+
+    const historyRes = await fetch(`${baseUrl}/appointments/1/history`);
+    const historyData = await historyRes.json();
+    assert.strictEqual(historyRes.status, 200);
+    assert.strictEqual(historyData.appointmentId, 1);
+    assert.strictEqual(historyData.total, 3);
+    assert.deepStrictEqual(
+      historyData.data.map((e: { action: string }) => e.action),
+      ['CREATED', 'RESCHEDULED', 'COMPLETED']
+    );
+
+    const notFoundRes = await fetch(`${baseUrl}/appointments/9999/history`);
+    assert.strictEqual(notFoundRes.status, 404);
+  });
+
   test('DELETE /appointments/:id requires valid API key (401 Unauthorized)', async () => {
     // Attempt deletion without auth header
     const noAuthRes = await fetch(`${baseUrl}/appointments/1`, {

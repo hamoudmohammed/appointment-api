@@ -11,6 +11,8 @@ import {
   SlotInfo,
   AppointmentStatsFilter,
   AppointmentStatsResult,
+  AppointmentHistoryAction,
+  AppointmentHistoryEntry,
   DEFAULT_PROVIDER
 } from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
@@ -57,6 +59,20 @@ export class AppointmentService {
 
   public async getById(id: number): Promise<Appointment | undefined> {
     return this.repository.findById(id);
+  }
+
+  public async getHistory(id: number): Promise<ServiceResult<AppointmentHistoryEntry[]>> {
+    const existing = await this.repository.findById(id);
+    if (!existing) {
+      return {
+        success: false,
+        error: `Appointment with ID ${id} not found.`,
+        errorType: 'NOT_FOUND'
+      };
+    }
+
+    const entries = await this.repository.findHistoryByAppointmentId(id);
+    return { success: true, data: entries };
   }
 
   public static readonly BUSINESS_HOURS = {
@@ -279,6 +295,19 @@ export class AppointmentService {
         status: 'CONFIRMED'
       });
 
+      await this.repository.addHistory({
+        appointmentId: newAppointment.id,
+        action: 'CREATED',
+        newValues: {
+          customer: newAppointment.customer,
+          provider: newAppointment.provider,
+          serviceType: newAppointment.serviceType,
+          date: newAppointment.date,
+          time: newAppointment.time,
+          status: newAppointment.status
+        }
+      });
+
       this.eventBus.dispatch('appointment:created', newAppointment);
 
       return { success: true, data: newAppointment };
@@ -379,6 +408,48 @@ export class AppointmentService {
         };
       }
 
+      // Record audit history for modified fields
+      const trackedFields: Array<keyof Appointment> = [
+        'customer',
+        'email',
+        'phone',
+        'provider',
+        'serviceType',
+        'notes',
+        'date',
+        'time',
+        'status'
+      ];
+      const previousValues: Record<string, unknown> = {};
+      const newValues: Record<string, unknown> = {};
+      for (const field of trackedFields) {
+        if (current[field] !== updatedAppointment[field]) {
+          previousValues[field] = current[field] ?? null;
+          newValues[field] = updatedAppointment[field] ?? null;
+        }
+      }
+
+      if (Object.keys(newValues).length > 0) {
+        let action: AppointmentHistoryAction = 'UPDATED';
+        if (updatedAppointment.status !== current.status) {
+          if (updatedAppointment.status === 'CANCELLED') action = 'CANCELLED';
+          else if (updatedAppointment.status === 'COMPLETED') action = 'COMPLETED';
+          else if (updatedAppointment.status === 'NO_SHOW') action = 'NO_SHOW';
+        } else if (
+          updatedAppointment.date !== current.date ||
+          updatedAppointment.time !== current.time
+        ) {
+          action = 'RESCHEDULED';
+        }
+
+        await this.repository.addHistory({
+          appointmentId: id,
+          action,
+          previousValues,
+          newValues
+        });
+      }
+
       // Check if rescheduled
       if (
         (dto.date && dto.date !== current.date) ||
@@ -445,6 +516,12 @@ export class AppointmentService {
 
     const updated = await this.repository.update(id, { status: 'CANCELLED' });
     if (updated) {
+      await this.repository.addHistory({
+        appointmentId: id,
+        action: 'CANCELLED',
+        previousValues: { status: current.status },
+        newValues: { status: 'CANCELLED' }
+      });
       this.eventBus.dispatch('appointment:cancelled', updated);
     }
     return { success: true, data: updated! };
@@ -474,6 +551,12 @@ export class AppointmentService {
 
     const updated = await this.repository.update(id, { status: 'COMPLETED' });
     if (updated) {
+      await this.repository.addHistory({
+        appointmentId: id,
+        action: 'COMPLETED',
+        previousValues: { status: current.status },
+        newValues: { status: 'COMPLETED' }
+      });
       this.eventBus.dispatch('appointment:completed', updated);
     }
     return { success: true, data: updated! };

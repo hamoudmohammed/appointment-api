@@ -529,4 +529,44 @@ describe('AppointmentService', () => {
       assert.strictEqual(weberStats.data?.byProvider['Dr. Weber'], 2);
     });
   });
+
+  describe('getHistory()', () => {
+    test('tracks CREATED, UPDATED, RESCHEDULED, and CANCELLED audit entries chronologically', async () => {
+      const created = await service.create({
+        customer: 'Audit Client',
+        provider: 'Dr. Weber',
+        date: '2026-12-10',
+        time: '09:00'
+      });
+      assert.strictEqual(created.success, true);
+      const id = created.data!.id;
+
+      await service.update(id, { notes: 'Bring previous lab results' });
+      await service.update(id, { date: '2026-12-12', time: '11:30' });
+      await service.cancelAppointment(id);
+
+      const historyRes = await service.getHistory(id);
+      assert.strictEqual(historyRes.success, true);
+      const entries = historyRes.data!;
+      assert.strictEqual(entries.length, 4);
+      assert.strictEqual(entries[0].action, 'CREATED');
+      assert.strictEqual(entries[0].newValues?.customer, 'Audit Client');
+      assert.strictEqual(entries[1].action, 'UPDATED');
+      assert.strictEqual(entries[1].newValues?.notes, 'Bring previous lab results');
+      assert.strictEqual(entries[2].action, 'RESCHEDULED');
+      assert.strictEqual(entries[2].previousValues?.date, '2026-12-10');
+      assert.strictEqual(entries[2].newValues?.date, '2026-12-12');
+      assert.strictEqual(entries[2].previousValues?.time, '09:00');
+      assert.strictEqual(entries[2].newValues?.time, '11:30');
+      assert.strictEqual(entries[3].action, 'CANCELLED');
+      assert.strictEqual(entries[3].previousValues?.status, 'CONFIRMED');
+      assert.strictEqual(entries[3].newValues?.status, 'CANCELLED');
+    });
+
+    test('returns NOT_FOUND for unknown appointment ID', async () => {
+      const res = await service.getHistory(9999);
+      assert.strictEqual(res.success, false);
+      assert.strictEqual(res.errorType, 'NOT_FOUND');
+    });
+  });
 });

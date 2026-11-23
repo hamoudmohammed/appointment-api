@@ -4,14 +4,42 @@ import {
   AppointmentStatus,
   AppointmentServiceType,
   AppointmentQueryFilter,
+  AppointmentHistoryAction,
+  AppointmentHistoryEntry,
   DEFAULT_PROVIDER
 } from '../types/appointment.js';
 import {
   IAppointmentRepository,
   CreateAppointmentRecord,
   UpdateAppointmentRecord,
+  CreateHistoryRecord,
   RepositoryFindAllResult
 } from './appointmentRepository.js';
+
+interface AppointmentHistoryDbRow {
+  id: number;
+  appointment_id: number;
+  action: string;
+  previous_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  timestamp: string | Date;
+}
+
+function mapRowToHistoryEntry(row: AppointmentHistoryDbRow): AppointmentHistoryEntry {
+  const timestampStr =
+    row.timestamp instanceof Date
+      ? row.timestamp.toISOString()
+      : new Date(row.timestamp).toISOString();
+
+  return {
+    id: row.id,
+    appointmentId: row.appointment_id,
+    action: row.action as AppointmentHistoryAction,
+    previousValues: row.previous_values ?? undefined,
+    newValues: row.new_values ?? undefined,
+    timestamp: timestampStr
+  };
+}
 
 interface AppointmentDbRow {
   id: number;
@@ -246,5 +274,31 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
       return undefined;
     }
     return mapRowToAppointment(res.rows[0]);
+  }
+
+  public async addHistory(record: CreateHistoryRecord): Promise<AppointmentHistoryEntry> {
+    const res = await this.pool.query<AppointmentHistoryDbRow>(
+      `INSERT INTO appointment_history (appointment_id, action, previous_values, new_values)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, appointment_id, action, previous_values, new_values, timestamp`,
+      [
+        record.appointmentId,
+        record.action,
+        record.previousValues ? JSON.stringify(record.previousValues) : null,
+        record.newValues ? JSON.stringify(record.newValues) : null
+      ]
+    );
+    return mapRowToHistoryEntry(res.rows[0]);
+  }
+
+  public async findHistoryByAppointmentId(appointmentId: number): Promise<AppointmentHistoryEntry[]> {
+    const res = await this.pool.query<AppointmentHistoryDbRow>(
+      `SELECT id, appointment_id, action, previous_values, new_values, timestamp
+       FROM appointment_history
+       WHERE appointment_id = $1
+       ORDER BY timestamp ASC, id ASC`,
+      [appointmentId]
+    );
+    return res.rows.map(mapRowToHistoryEntry);
   }
 }

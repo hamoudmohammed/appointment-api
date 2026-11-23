@@ -33,3 +33,21 @@ SELECT 'Max Mustermann', 'max@example.com', '+49 151 12345678', 'General', 'CONS
 WHERE NOT EXISTS (
     SELECT 1 FROM appointments WHERE id = 1
 );
+
+-- Audit history table tracking appointment lifecycle changes
+CREATE TABLE IF NOT EXISTS appointment_history (
+    id SERIAL PRIMARY KEY,
+    appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+    action VARCHAR(30) NOT NULL CHECK (action IN ('CREATED', 'UPDATED', 'RESCHEDULED', 'CANCELLED', 'COMPLETED', 'NO_SHOW')),
+    previous_values JSONB,
+    new_values JSONB,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_appointment_history_appointment_id
+ON appointment_history (appointment_id, timestamp ASC, id ASC);
+
+INSERT INTO appointment_history (appointment_id, action, new_values, timestamp)
+SELECT 1, 'CREATED', '{"customer":"Max Mustermann","provider":"General","serviceType":"CONSULTATION","date":"2026-11-20","time":"10:00","status":"CONFIRMED"}'::jsonb, '2026-11-14 10:00:00+00'
+WHERE EXISTS (SELECT 1 FROM appointments WHERE id = 1)
+  AND NOT EXISTS (SELECT 1 FROM appointment_history WHERE appointment_id = 1);

@@ -767,6 +767,48 @@ export const openApiSpec = {
           }
         }
       }
+    },
+    '/appointments/{id}/history': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'Get appointment audit history',
+        description: 'Returns the chronological audit trail of lifecycle events (CREATED, UPDATED, RESCHEDULED, CANCELLED, COMPLETED, NO_SHOW) for an appointment.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'Unique numeric appointment ID',
+            schema: { type: 'integer', example: 1 }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Chronological list of audit history entries',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    appointmentId: { type: 'integer', example: 1 },
+                    total: { type: 'integer', example: 2 },
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/AppointmentHistoryEntry' }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
     }
   },
   components: {
@@ -842,6 +884,22 @@ export const openApiSpec = {
             enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
             example: 'CONFIRMED'
           }
+        }
+      },
+      AppointmentHistoryEntry: {
+        type: 'object',
+        required: ['id', 'appointmentId', 'action', 'timestamp'],
+        properties: {
+          id: { type: 'integer', example: 1 },
+          appointmentId: { type: 'integer', example: 1 },
+          action: {
+            type: 'string',
+            enum: ['CREATED', 'UPDATED', 'RESCHEDULED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'],
+            example: 'RESCHEDULED'
+          },
+          previousValues: { type: 'object', additionalProperties: true, example: { date: '2026-11-20', time: '10:00' } },
+          newValues: { type: 'object', additionalProperties: true, example: { date: '2026-11-25', time: '15:00' } },
+          timestamp: { type: 'string', format: 'date-time', example: '2026-11-18T12:30:00.000Z' }
         }
       },
       ErrorResponse: {
