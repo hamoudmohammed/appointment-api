@@ -341,6 +341,13 @@ export const openApiSpec = {
             required: false,
             description: 'Optional provider name to check availability for (defaults to "General")',
             schema: { type: 'string', example: 'Dr. Weber' }
+          },
+          {
+            name: 'slotDuration',
+            in: 'query',
+            required: false,
+            description: 'Slot interval duration in minutes (15, 30, 45, or 60; defaults to 30)',
+            schema: { type: 'integer', enum: [15, 30, 45, 60], default: 30, example: 30 }
           }
         ],
         responses: {

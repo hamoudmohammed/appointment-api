@@ -488,6 +488,31 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(notFoundRes.status, 404);
   });
 
+  test('POST/PATCH enforce business hours and GET /appointments/slots supports slotDuration', async () => {
+    const afterHoursRes = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Late Night Client',
+        date: '2026-12-10',
+        time: '21:00'
+      })
+    });
+    const afterHoursData = await afterHoursRes.json();
+    assert.strictEqual(afterHoursRes.status, 400);
+    assert.strictEqual(afterHoursData.errorType, 'VALIDATION_ERROR');
+    assert.match(afterHoursData.error, /business hours/i);
+
+    const hourlySlotsRes = await fetch(`${baseUrl}/appointments/slots?date=2026-11-20&slotDuration=60`);
+    const hourlySlotsData = await hourlySlotsRes.json();
+    assert.strictEqual(hourlySlotsRes.status, 200);
+    assert.strictEqual(hourlySlotsData.totalSlots, 9);
+    assert.strictEqual(hourlySlotsData.businessHours.slotDurationMinutes, 60);
+
+    const badDurationRes = await fetch(`${baseUrl}/appointments/slots?date=2026-11-20&slotDuration=25`);
+    assert.strictEqual(badDurationRes.status, 400);
+  });
+
   test('DELETE /appointments/:id requires valid API key (401 Unauthorized)', async () => {
     // Attempt deletion without auth header
     const noAuthRes = await fetch(`${baseUrl}/appointments/1`, {

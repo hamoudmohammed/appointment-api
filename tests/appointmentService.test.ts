@@ -569,4 +569,65 @@ describe('AppointmentService', () => {
       assert.strictEqual(res.errorType, 'NOT_FOUND');
     });
   });
+
+  describe('Business hours & configurable slot durations', () => {
+    test('rejects booking and rescheduling outside business hours (08:00 - 17:00)', async () => {
+      for (const badTime of ['07:30', '17:00', '22:15']) {
+        const res = await service.create({
+          customer: 'After Hours Client',
+          date: '2026-12-10',
+          time: badTime
+        });
+        assert.strictEqual(res.success, false, `Expected ${badTime} to be rejected`);
+        assert.strictEqual(res.errorType, 'VALIDATION_ERROR');
+        assert.match(res.error || '', /business hours/i);
+      }
+
+      const updateRes = await service.update(1, { time: '18:00' });
+      assert.strictEqual(updateRes.success, false);
+      assert.strictEqual(updateRes.errorType, 'VALIDATION_ERROR');
+      assert.match(updateRes.error || '', /business hours/i);
+    });
+
+    test('rejects past dates when allowPastDates is false', async () => {
+      const strictService = new AppointmentService(new InMemoryAppointmentRepository(), undefined, {
+        allowPastDates: false,
+        now: () => new Date('2026-11-23T10:00:00.000Z')
+      });
+
+      const pastRes = await strictService.create({
+        customer: 'Time Traveler',
+        date: '2026-11-22',
+        time: '10:00'
+      });
+      assert.strictEqual(pastRes.success, false);
+      assert.strictEqual(pastRes.errorType, 'VALIDATION_ERROR');
+      assert.match(pastRes.error || '', /past/i);
+
+      const todayRes = await strictService.create({
+        customer: 'Same Day Client',
+        date: '2026-11-23',
+        time: '14:00'
+      });
+      assert.strictEqual(todayRes.success, true);
+    });
+
+    test('getAvailableSlots() supports custom slotDuration (15, 30, 45, 60) and rejects invalid values', async () => {
+      const hourly = await service.getAvailableSlots('2026-11-20', 'General', 60);
+      assert.strictEqual(hourly.success, true);
+      assert.strictEqual(hourly.data?.businessHours.slotDurationMinutes, 60);
+      assert.strictEqual(hourly.data?.totalSlots, 9);
+      assert.strictEqual(hourly.data?.bookedCount, 1);
+      assert.strictEqual(hourly.data?.availableSlots.includes('10:00'), false);
+
+      const quarterHour = await service.getAvailableSlots('2026-11-20', 'General', 15);
+      assert.strictEqual(quarterHour.success, true);
+      assert.strictEqual(quarterHour.data?.totalSlots, 36);
+
+      const invalidDuration = await service.getAvailableSlots('2026-11-20', 'General', 25);
+      assert.strictEqual(invalidDuration.success, false);
+      assert.strictEqual(invalidDuration.errorType, 'VALIDATION_ERROR');
+      assert.match(invalidDuration.error || '', /slotDuration/i);
+    });
+  });
 });

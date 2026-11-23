@@ -327,7 +327,9 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
     if (method === 'GET' && pathname === '/appointments/slots') {
       const dateParam = url.searchParams.get('date') ?? undefined;
       const providerParam = url.searchParams.get('provider') ?? undefined;
-      const result = await currentService.getAvailableSlots(dateParam, providerParam);
+      const slotDurationParam = url.searchParams.get('slotDuration');
+      const slotDuration = slotDurationParam !== null ? Number(slotDurationParam) : undefined;
+      const result = await currentService.getAvailableSlots(dateParam, providerParam, slotDuration);
       if (!result.success) {
         sendJson(res, 400, { error: result.error, errorType: result.errorType });
         return;

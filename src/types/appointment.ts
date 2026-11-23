@@ -1,4 +1,19 @@
 export const DEFAULT_PROVIDER = 'General';
+export const ALLOWED_SLOT_DURATIONS = [15, 30, 45, 60] as const;
+export type SlotDurationMinutes = (typeof ALLOWED_SLOT_DURATIONS)[number];
+
+export interface BusinessHoursConfig {
+  start: string; // HH:mm
+  end: string; // HH:mm
+  slotDurationMinutes: number;
+}
+
+export interface AppointmentServiceOptions {
+  businessHours?: Partial<BusinessHoursConfig> | undefined;
+  enforceBusinessHours?: boolean | undefined;
+  allowPastDates?: boolean | undefined;
+  now?: (() => Date) | undefined;
+}
 
 export type AppointmentStatus =
   | 'PENDING'

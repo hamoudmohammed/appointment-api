@@ -13,6 +13,9 @@ import {
   AppointmentStatsResult,
   AppointmentHistoryAction,
   AppointmentHistoryEntry,
+  AppointmentServiceOptions,
+  BusinessHoursConfig,
+  ALLOWED_SLOT_DURATIONS,
   DEFAULT_PROVIDER
 } from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
@@ -20,10 +23,26 @@ import { InMemoryAppointmentRepository } from '../repositories/inMemoryAppointme
 import { domainEventBus, DomainEventBus } from './notificationService.js';
 
 export class AppointmentService {
+  private readonly businessHours: BusinessHoursConfig;
+  private readonly enforceBusinessHours: boolean;
+  private readonly allowPastDates: boolean;
+  private readonly nowProvider: () => Date;
+
   constructor(
     private readonly repository: IAppointmentRepository = new InMemoryAppointmentRepository(),
-    private readonly eventBus: DomainEventBus = domainEventBus
-  ) {}
+    private readonly eventBus: DomainEventBus = domainEventBus,
+    options: AppointmentServiceOptions = {}
+  ) {
+    this.businessHours = {
+      start: options.businessHours?.start ?? AppointmentService.BUSINESS_HOURS.start,
+      end: options.businessHours?.end ?? AppointmentService.BUSINESS_HOURS.end,
+      slotDurationMinutes:
+        options.businessHours?.slotDurationMinutes ?? AppointmentService.BUSINESS_HOURS.slotDurationMinutes
+    };
+    this.enforceBusinessHours = options.enforceBusinessHours ?? true;
+    this.allowPastDates = options.allowPastDates ?? process.env.PREVENT_PAST_BOOKING !== 'true';
+    this.nowProvider = options.now ?? (() => new Date());
+  }
 
   public async getAll(filter?: AppointmentQueryFilter): Promise<ServiceResult<PaginatedAppointmentsResult>> {
     if (filter) {
@@ -81,24 +100,42 @@ export class AppointmentService {
     slotDurationMinutes: 30
   };
 
-  private generateDailySlots(): string[] {
-    const slots: string[] = [];
-    const [startH, startM] = AppointmentService.BUSINESS_HOURS.start.split(':').map(Number);
-    const [endH, endM] = AppointmentService.BUSINESS_HOURS.end.split(':').map(Number);
+  private static timeToMinutes(timeStr: string): number {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+  }
 
-    let currentMinutes = startH * 60 + startM;
-    const endMinutes = endH * 60 + endM;
+  private isWithinBusinessHours(timeStr: string): boolean {
+    const minutes = AppointmentService.timeToMinutes(timeStr);
+    const startMinutes = AppointmentService.timeToMinutes(this.businessHours.start);
+    const endMinutes = AppointmentService.timeToMinutes(this.businessHours.end);
+    return minutes >= startMinutes && minutes < endMinutes;
+  }
+
+  private isPastDate(dateStr: string): boolean {
+    const todayIso = this.nowProvider().toISOString().split('T')[0];
+    return dateStr < todayIso;
+  }
+
+  private generateDailySlots(slotDurationMinutes: number = this.businessHours.slotDurationMinutes): string[] {
+    const slots: string[] = [];
+    let currentMinutes = AppointmentService.timeToMinutes(this.businessHours.start);
+    const endMinutes = AppointmentService.timeToMinutes(this.businessHours.end);
 
     while (currentMinutes < endMinutes) {
       const h = Math.floor(currentMinutes / 60).toString().padStart(2, '0');
       const m = (currentMinutes % 60).toString().padStart(2, '0');
       slots.push(`${h}:${m}`);
-      currentMinutes += AppointmentService.BUSINESS_HOURS.slotDurationMinutes;
+      currentMinutes += slotDurationMinutes;
     }
     return slots;
   }
 
-  public async getAvailableSlots(date?: string, provider?: string): Promise<ServiceResult<AvailableSlotsResult>> {
+  public async getAvailableSlots(
+    date?: string,
+    provider?: string,
+    slotDurationMinutes?: number
+  ): Promise<ServiceResult<AvailableSlotsResult>> {
     if (!date) {
       return {
         success: false,
@@ -111,6 +148,18 @@ export class AppointmentService {
       return {
         success: false,
         error: 'Query parameter "date" must be a valid calendar date in YYYY-MM-DD format.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const effectiveDuration = slotDurationMinutes ?? this.businessHours.slotDurationMinutes;
+    if (
+      !Number.isInteger(effectiveDuration) ||
+      !(ALLOWED_SLOT_DURATIONS as readonly number[]).includes(effectiveDuration)
+    ) {
+      return {
+        success: false,
+        error: `Query parameter "slotDuration" must be one of: ${ALLOWED_SLOT_DURATIONS.join(', ')} (minutes).`,
         errorType: 'VALIDATION_ERROR'
       };
     }
@@ -137,7 +186,7 @@ export class AppointmentService {
         .filter((item) => item.provider.toLowerCase() === normalizedProvider)
         .map((item) => item.time)
     );
-    const allSlots = this.generateDailySlots();
+    const allSlots = this.generateDailySlots(effectiveDuration);
 
     const slots: SlotInfo[] = allSlots.map((time) => ({
       time,
@@ -154,7 +203,11 @@ export class AppointmentService {
       data: {
         date,
         provider: targetProvider,
-        businessHours: AppointmentService.BUSINESS_HOURS,
+        businessHours: {
+          start: this.businessHours.start,
+          end: this.businessHours.end,
+          slotDurationMinutes: effectiveDuration
+        },
         totalSlots,
         availableCount,
         bookedCount,
@@ -636,10 +689,18 @@ export class AppointmentService {
       return 'Field "date" is required and must be a valid calendar date in YYYY-MM-DD format.';
     }
 
+    if (!this.allowPastDates && this.isPastDate(dto.date)) {
+      return 'Field "date" cannot be in the past.';
+    }
+
     // Validate time format HH:mm (24-hour)
     const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
     if (!dto.time || !timeRegex.test(dto.time)) {
       return 'Field "time" is required and must follow HH:mm (24h) format.';
+    }
+
+    if (this.enforceBusinessHours && !this.isWithinBusinessHours(dto.time)) {
+      return `Field "time" must be within business hours (${this.businessHours.start} - ${this.businessHours.end}).`;
     }
 
     return null;
@@ -694,13 +755,23 @@ export class AppointmentService {
       }
     }
 
-    if (dto.date !== undefined && (!dto.date || !AppointmentService.isValidCalendarDate(dto.date))) {
-      return 'Field "date" must be a valid calendar date in YYYY-MM-DD format.';
+    if (dto.date !== undefined) {
+      if (!dto.date || !AppointmentService.isValidCalendarDate(dto.date)) {
+        return 'Field "date" must be a valid calendar date in YYYY-MM-DD format.';
+      }
+      if (!this.allowPastDates && this.isPastDate(dto.date)) {
+        return 'Field "date" cannot be in the past.';
+      }
     }
 
     const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
-    if (dto.time !== undefined && (!dto.time || !timeRegex.test(dto.time))) {
-      return 'Field "time" must follow HH:mm (24h) format.';
+    if (dto.time !== undefined) {
+      if (!dto.time || !timeRegex.test(dto.time)) {
+        return 'Field "time" must follow HH:mm (24h) format.';
+      }
+      if (this.enforceBusinessHours && !this.isWithinBusinessHours(dto.time)) {
+        return `Field "time" must be within business hours (${this.businessHours.start} - ${this.businessHours.end}).`;
+      }
     }
 
     if (dto.status !== undefined && !AppointmentService.ALLOWED_STATUSES.includes(dto.status)) {
