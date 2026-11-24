@@ -622,4 +622,65 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.headers.get('x-request-id'), customId);
   });
+
+  test('POST /appointments/:id/no-show marks appointment as NO_SHOW and rejects terminal states', async () => {
+    const res = await fetch(`${baseUrl}/appointments/1/no-show`, { method: 'POST' });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.data.status, 'NO_SHOW');
+
+    // Unknown ID -> 404
+    const missing = await fetch(`${baseUrl}/appointments/9999/no-show`, { method: 'POST' });
+    assert.strictEqual(missing.status, 404);
+
+    // Completed appointment -> 400
+    const created = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer: 'Done Client', date: '2026-12-18', time: '11:00' })
+    });
+    const createdId = (await created.json()).data.id;
+    await fetch(`${baseUrl}/appointments/${createdId}/complete`, { method: 'POST' });
+
+    const invalid = await fetch(`${baseUrl}/appointments/${createdId}/no-show`, { method: 'POST' });
+    assert.strictEqual(invalid.status, 400);
+    assert.strictEqual((await invalid.json()).errorType, 'VALIDATION_ERROR');
+  });
+
+  test('POST /appointments/:id/confirm confirms PENDING appointments and returns 409 on slot conflict', async () => {
+    // Move appointment #1 to PENDING via PATCH
+    const patchRes = await fetch(`${baseUrl}/appointments/1`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'PENDING' })
+    });
+    assert.strictEqual(patchRes.status, 200);
+
+    // Confirm it via POST /appointments/1/confirm
+    const confirmRes = await fetch(`${baseUrl}/appointments/1/confirm`, { method: 'POST' });
+    assert.strictEqual(confirmRes.status, 200);
+    const confirmBody = await confirmRes.json();
+    assert.strictEqual(confirmBody.data.status, 'CONFIRMED');
+
+    // Move appointment #1 back to PENDING, book the same slot with another appointment, then try confirming #1 -> 409
+    await fetch(`${baseUrl}/appointments/1`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'PENDING' })
+    });
+    const competing = await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer: 'Slot Taker', date: '2026-11-20', time: '10:00' })
+    });
+    assert.strictEqual(competing.status, 201);
+
+    const conflictRes = await fetch(`${baseUrl}/appointments/1/confirm`, { method: 'POST' });
+    assert.strictEqual(conflictRes.status, 409);
+    assert.strictEqual((await conflictRes.json()).errorType, 'CONFLICT');
+
+    // Unknown ID -> 404
+    const missing = await fetch(`${baseUrl}/appointments/9999/confirm`, { method: 'POST' });
+    assert.strictEqual(missing.status, 404);
+  });
 });

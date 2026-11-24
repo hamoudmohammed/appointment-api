@@ -630,4 +630,96 @@ describe('AppointmentService', () => {
       assert.match(invalidDuration.error || '', /slotDuration/i);
     });
   });
+
+  describe('markNoShow() & confirmAppointment()', () => {
+    test('markNoShow() transitions CONFIRMED to NO_SHOW, records history, and is idempotent', async () => {
+      const res = await service.markNoShow(1);
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data?.status, 'NO_SHOW');
+
+      // Idempotent second call
+      const second = await service.markNoShow(1);
+      assert.strictEqual(second.success, true);
+      assert.strictEqual(second.data?.status, 'NO_SHOW');
+
+      const history = await service.getHistory(1);
+      assert.strictEqual(history.success, true);
+      assert.strictEqual(history.data?.filter((e) => e.action === 'NO_SHOW').length, 1);
+    });
+
+    test('markNoShow() rejects CANCELLED, COMPLETED, and unknown IDs', async () => {
+      const missing = await service.markNoShow(9999);
+      assert.strictEqual(missing.success, false);
+      assert.strictEqual(missing.errorType, 'NOT_FOUND');
+
+      await service.cancelAppointment(1);
+      const cancelledRes = await service.markNoShow(1);
+      assert.strictEqual(cancelledRes.success, false);
+      assert.strictEqual(cancelledRes.errorType, 'VALIDATION_ERROR');
+
+      const created = await service.create({
+        customer: 'Completed Customer',
+        date: '2026-12-15',
+        time: '09:00'
+      });
+      await service.completeAppointment(created.data!.id);
+      const completedRes = await service.markNoShow(created.data!.id);
+      assert.strictEqual(completedRes.success, false);
+      assert.strictEqual(completedRes.errorType, 'VALIDATION_ERROR');
+    });
+
+    test('confirmAppointment() confirms PENDING appointment, detects conflicts, and rejects terminal states', async () => {
+      const repo = new InMemoryAppointmentRepository([
+        {
+          id: 1,
+          customer: 'Pending Client',
+          provider: 'Dr. Weber',
+          serviceType: 'CONSULTATION',
+          date: '2026-12-20',
+          time: '10:00',
+          status: 'PENDING',
+          createdAt: '2026-11-14T10:00:00.000Z'
+        },
+        {
+          id: 2,
+          customer: 'Conflicting Pending Client',
+          provider: 'Dr. Weber',
+          serviceType: 'CONSULTATION',
+          date: '2026-12-20',
+          time: '10:00',
+          status: 'PENDING',
+          createdAt: '2026-11-14T10:05:00.000Z'
+        }
+      ]);
+      const localService = new AppointmentService(repo);
+
+      const confirmed = await localService.confirmAppointment(1);
+      assert.strictEqual(confirmed.success, true);
+      assert.strictEqual(confirmed.data?.status, 'CONFIRMED');
+
+      // Idempotent call on already confirmed appointment
+      const repeat = await localService.confirmAppointment(1);
+      assert.strictEqual(repeat.success, true);
+
+      // History recorded CONFIRMED
+      const history = await localService.getHistory(1);
+      assert.strictEqual(history.data?.some((e) => e.action === 'CONFIRMED'), true);
+
+      // Second pending appointment for same slot/provider hits CONFLICT
+      const conflict = await localService.confirmAppointment(2);
+      assert.strictEqual(conflict.success, false);
+      assert.strictEqual(conflict.errorType, 'CONFLICT');
+
+      // Terminal states cannot be confirmed
+      await localService.cancelAppointment(1);
+      const cancelledConfirm = await localService.confirmAppointment(1);
+      assert.strictEqual(cancelledConfirm.success, false);
+      assert.strictEqual(cancelledConfirm.errorType, 'VALIDATION_ERROR');
+
+      // Missing ID
+      const missing = await localService.confirmAppointment(9999);
+      assert.strictEqual(missing.success, false);
+      assert.strictEqual(missing.errorType, 'NOT_FOUND');
+    });
+  });
 });

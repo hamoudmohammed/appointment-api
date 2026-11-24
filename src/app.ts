@@ -352,7 +352,7 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
       return;
     }
 
-    // Quick action routes (/appointments/:id/cancel, /appointments/:id/complete)
+    // Quick action routes (/appointments/:id/cancel, /complete, /no-show, /confirm)
     const cancelMatch = pathname.match(/^\/appointments\/(\d+)\/cancel$/);
     if (method === 'POST' && cancelMatch) {
       const id = parseInt(cancelMatch[1], 10);
@@ -376,6 +376,34 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         return;
       }
       sendJson(res, 200, { message: 'Appointment marked as completed successfully', data: result.data });
+      return;
+    }
+
+    const noShowMatch = pathname.match(/^\/appointments\/(\d+)\/no-show$/);
+    if (method === 'POST' && noShowMatch) {
+      const id = parseInt(noShowMatch[1], 10);
+      const result = await currentService.markNoShow(id);
+      if (!result.success) {
+        const statusCode = result.errorType === 'NOT_FOUND' ? 404 : 400;
+        sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, { message: 'Appointment marked as no-show successfully', data: result.data });
+      return;
+    }
+
+    const confirmMatch = pathname.match(/^\/appointments\/(\d+)\/confirm$/);
+    if (method === 'POST' && confirmMatch) {
+      const id = parseInt(confirmMatch[1], 10);
+      const result = await currentService.confirmAppointment(id);
+      if (!result.success) {
+        let statusCode = 400;
+        if (result.errorType === 'NOT_FOUND') statusCode = 404;
+        else if (result.errorType === 'CONFLICT') statusCode = 409;
+        sendJson(res, statusCode, { error: result.error, errorType: result.errorType });
+        return;
+      }
+      sendJson(res, 200, { message: 'Appointment confirmed successfully', data: result.data });
       return;
     }
 

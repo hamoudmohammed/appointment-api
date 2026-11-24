@@ -140,6 +140,7 @@ export type AppointmentHistoryAction =
   | 'CREATED'
   | 'UPDATED'
   | 'RESCHEDULED'
+  | 'CONFIRMED'
   | 'CANCELLED'
   | 'COMPLETED'
   | 'NO_SHOW';

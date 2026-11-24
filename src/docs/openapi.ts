@@ -775,6 +775,98 @@ export const openApiSpec = {
         }
       }
     },
+    '/appointments/{id}/no-show': {
+      post: {
+        tags: ['Appointments'],
+        summary: 'Mark an appointment as no-show',
+        description: 'Marks a pending or confirmed appointment as NO_SHOW when the customer did not attend.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'integer' }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Appointment marked as no-show',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Appointment marked as no-show successfully' },
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Cannot mark a cancelled or completed appointment as no-show',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
+    },
+    '/appointments/{id}/confirm': {
+      post: {
+        tags: ['Appointments'],
+        summary: 'Confirm a pending appointment',
+        description: 'Transitions a PENDING appointment to CONFIRMED after verifying slot availability for the provider.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'integer' }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Appointment confirmed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Appointment confirmed successfully' },
+                    data: { $ref: '#/components/schemas/Appointment' }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Only PENDING appointments can be confirmed',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          },
+          '404': {
+            description: 'Appointment not found',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          },
+          '409': {
+            description: 'Conflict - Time slot is already booked by another confirmed appointment',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
+    },
     '/appointments/{id}/history': {
       get: {
         tags: ['Appointments'],
@@ -901,7 +993,7 @@ export const openApiSpec = {
           appointmentId: { type: 'integer', example: 1 },
           action: {
             type: 'string',
-            enum: ['CREATED', 'UPDATED', 'RESCHEDULED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'],
+            enum: ['CREATED', 'UPDATED', 'RESCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'],
             example: 'RESCHEDULED'
           },
           previousValues: { type: 'object', additionalProperties: true, example: { date: '2026-11-20', time: '10:00' } },

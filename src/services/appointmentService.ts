@@ -488,6 +488,7 @@ export class AppointmentService {
           if (updatedAppointment.status === 'CANCELLED') action = 'CANCELLED';
           else if (updatedAppointment.status === 'COMPLETED') action = 'COMPLETED';
           else if (updatedAppointment.status === 'NO_SHOW') action = 'NO_SHOW';
+          else if (updatedAppointment.status === 'CONFIRMED') action = 'CONFIRMED';
         } else if (
           updatedAppointment.date !== current.date ||
           updatedAppointment.time !== current.time
@@ -517,6 +518,10 @@ export class AppointmentService {
         this.eventBus.dispatch('appointment:cancelled', updatedAppointment);
       } else if (dto.status === 'COMPLETED') {
         this.eventBus.dispatch('appointment:completed', updatedAppointment);
+      } else if (dto.status === 'NO_SHOW') {
+        this.eventBus.dispatch('appointment:no_show', updatedAppointment);
+      } else if (dto.status === 'CONFIRMED' && current.status !== 'CONFIRMED') {
+        this.eventBus.dispatch('appointment:confirmed', updatedAppointment);
       }
 
       return { success: true, data: updatedAppointment };
@@ -613,6 +618,109 @@ export class AppointmentService {
       this.eventBus.dispatch('appointment:completed', updated);
     }
     return { success: true, data: updated! };
+  }
+
+  public async markNoShow(id: number): Promise<ServiceResult<Appointment>> {
+    const current = await this.repository.findById(id);
+    if (!current) {
+      return {
+        success: false,
+        error: `Appointment with ID ${id} not found.`,
+        errorType: 'NOT_FOUND'
+      };
+    }
+
+    if (current.status === 'NO_SHOW') {
+      return { success: true, data: current };
+    }
+
+    if (current.status === 'CANCELLED') {
+      return {
+        success: false,
+        error: 'Cannot mark a cancelled appointment as no-show.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (current.status === 'COMPLETED') {
+      return {
+        success: false,
+        error: 'Cannot mark a completed appointment as no-show.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const updated = await this.repository.update(id, { status: 'NO_SHOW' });
+    if (updated) {
+      await this.repository.addHistory({
+        appointmentId: id,
+        action: 'NO_SHOW',
+        previousValues: { status: current.status },
+        newValues: { status: 'NO_SHOW' }
+      });
+      this.eventBus.dispatch('appointment:no_show', updated);
+    }
+    return { success: true, data: updated! };
+  }
+
+  public async confirmAppointment(id: number): Promise<ServiceResult<Appointment>> {
+    const current = await this.repository.findById(id);
+    if (!current) {
+      return {
+        success: false,
+        error: `Appointment with ID ${id} not found.`,
+        errorType: 'NOT_FOUND'
+      };
+    }
+
+    if (current.status === 'CONFIRMED') {
+      return { success: true, data: current };
+    }
+
+    if (current.status !== 'PENDING') {
+      return {
+        success: false,
+        error: `Cannot confirm an appointment with status "${current.status}". Only PENDING appointments can be confirmed.`,
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const slotTaken = await this.repository.findConfirmedBySlot(
+      current.date,
+      current.time,
+      id,
+      current.provider
+    );
+    if (slotTaken) {
+      return {
+        success: false,
+        error: `Time slot on ${current.date} at ${current.time} for provider "${current.provider}" is already booked. Please choose another time or provider.`,
+        errorType: 'CONFLICT'
+      };
+    }
+
+    try {
+      const updated = await this.repository.update(id, { status: 'CONFIRMED' });
+      if (updated) {
+        await this.repository.addHistory({
+          appointmentId: id,
+          action: 'CONFIRMED',
+          previousValues: { status: current.status },
+          newValues: { status: 'CONFIRMED' }
+        });
+        this.eventBus.dispatch('appointment:confirmed', updated);
+      }
+      return { success: true, data: updated! };
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505') {
+        return {
+          success: false,
+          error: `Time slot on ${current.date} at ${current.time} for provider "${current.provider}" is already booked. Please choose another time or provider.`,
+          errorType: 'CONFLICT'
+        };
+      }
+      throw err;
+    }
   }
 
   private static readonly ALLOWED_STATUSES: AppointmentStatus[] = [

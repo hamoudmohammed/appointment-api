@@ -67,4 +67,39 @@ describe('NotificationService & Domain Events', () => {
     assert.strictEqual(sent[0].eventType, 'appointment:completed');
     assert.match(sent[0].subject, /Thank You/);
   });
+
+  test('generates no-show notification when appointment is marked as no-show', async () => {
+    await appointmentService.markNoShow(1);
+
+    const sent = notificationService.getSentNotifications();
+    assert.strictEqual(sent.length, 1);
+    assert.strictEqual(sent[0].eventType, 'appointment:no_show');
+    assert.match(sent[0].subject, /Missed Appointment/);
+  });
+
+  test('generates confirmation notification when pending appointment is confirmed', async () => {
+    const repo = new InMemoryAppointmentRepository([
+      {
+        id: 10,
+        customer: 'Pending User',
+        email: 'pending@example.com',
+        provider: 'Dr. Weber',
+        serviceType: 'CHECKUP',
+        date: '2026-12-10',
+        time: '11:00',
+        status: 'PENDING',
+        createdAt: '2026-11-14T10:00:00.000Z'
+      }
+    ]);
+    const svc = new AppointmentService(repo, eventBus);
+
+    const res = await svc.confirmAppointment(10);
+    assert.strictEqual(res.success, true);
+
+    const sent = notificationService.getSentNotifications();
+    assert.strictEqual(sent.length, 1);
+    assert.strictEqual(sent[0].eventType, 'appointment:confirmed');
+    assert.strictEqual(sent[0].recipient, 'pending@example.com');
+    assert.match(sent[0].subject, /Appointment Confirmed/);
+  });
 });

@@ -61,6 +61,8 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `POST` | `/appointments` | Create a new appointment with validation & conflict checks | `201`, `400`, `409`, `413` |
 | `POST` | `/appointments/:id/cancel` | Quick action to cancel an appointment and free its time slot | `200`, `400`, `404` |
 | `POST` | `/appointments/:id/complete` | Mark an appointment session as completed | `200`, `400`, `404` |
+| `POST` | `/appointments/:id/no-show` | Mark an appointment as no-show and record audit trail | `200`, `400`, `404` |
+| `POST` | `/appointments/:id/confirm` | Confirm a pending appointment with slot conflict validation | `200`, `400`, `404`, `409` |
 | `PATCH` | `/appointments/:id` | Update customer, reschedule date/time, or cancel status | `200`, `400`, `404`, `409` |
 | `DELETE` | `/appointments/:id` | Remove an appointment (Admin protected via `X-API-Key`) | `200`, `401`, `404` |
 
