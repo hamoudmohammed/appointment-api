@@ -722,4 +722,23 @@ describe('AppointmentService', () => {
       assert.strictEqual(missing.errorType, 'NOT_FOUND');
     });
   });
+
+  describe('getAll() sorting & search validation', () => {
+    test('rejects invalid sortBy, invalid sortOrder, and overly long q', async () => {
+      const badSortBy = await service.getAll({ sortBy: 'password' as never });
+      assert.strictEqual(badSortBy.success, false);
+      assert.strictEqual(badSortBy.errorType, 'VALIDATION_ERROR');
+      assert.match(badSortBy.error || '', /sortBy/i);
+
+      const badSortOrder = await service.getAll({ sortOrder: 'random' as never });
+      assert.strictEqual(badSortOrder.success, false);
+      assert.strictEqual(badSortOrder.errorType, 'VALIDATION_ERROR');
+      assert.match(badSortOrder.error || '', /sortOrder/i);
+
+      const tooLongQ = await service.getAll({ q: 'a'.repeat(201) });
+      assert.strictEqual(tooLongQ.success, false);
+      assert.strictEqual(tooLongQ.errorType, 'VALIDATION_ERROR');
+      assert.match(tooLongQ.error || '', /"q"/i);
+    });
+  });
 });

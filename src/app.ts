@@ -5,7 +5,9 @@ import {
   UpdateAppointmentDTO,
   AppointmentQueryFilter,
   AppointmentStatus,
-  AppointmentServiceType
+  AppointmentServiceType,
+  AppointmentSortField,
+  SortOrder
 } from './types/appointment.js';
 import { openApiSpec, swaggerUiHtml } from './docs/openapi.js';
 import {
@@ -264,6 +266,9 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         email: url.searchParams.get('email') ?? undefined,
         provider: url.searchParams.get('provider') ?? undefined,
         serviceType: (url.searchParams.get('serviceType') as AppointmentServiceType) ?? undefined,
+        q: url.searchParams.get('q') ?? undefined,
+        sortBy: (url.searchParams.get('sortBy') as AppointmentSortField) ?? undefined,
+        sortOrder: (url.searchParams.get('sortOrder')?.toLowerCase() as SortOrder) ?? undefined,
         limit: 100
       };
 
@@ -310,6 +315,9 @@ export async function requestHandler(req: IncomingMessage, res: ServerResponse):
         email: url.searchParams.get('email') ?? undefined,
         provider: url.searchParams.get('provider') ?? undefined,
         serviceType: (url.searchParams.get('serviceType') as AppointmentServiceType) ?? undefined,
+        q: url.searchParams.get('q') ?? undefined,
+        sortBy: (url.searchParams.get('sortBy') as AppointmentSortField) ?? undefined,
+        sortOrder: (url.searchParams.get('sortOrder')?.toLowerCase() as SortOrder) ?? undefined,
         page,
         limit
       };

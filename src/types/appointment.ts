@@ -2,6 +2,19 @@ export const DEFAULT_PROVIDER = 'General';
 export const ALLOWED_SLOT_DURATIONS = [15, 30, 45, 60] as const;
 export type SlotDurationMinutes = (typeof ALLOWED_SLOT_DURATIONS)[number];
 
+export const ALLOWED_SORT_FIELDS = [
+  'date',
+  'time',
+  'customer',
+  'provider',
+  'status',
+  'createdAt'
+] as const;
+export type AppointmentSortField = (typeof ALLOWED_SORT_FIELDS)[number];
+
+export const ALLOWED_SORT_ORDERS = ['asc', 'desc'] as const;
+export type SortOrder = (typeof ALLOWED_SORT_ORDERS)[number];
+
 export interface BusinessHoursConfig {
   start: string; // HH:mm
   end: string; // HH:mm
@@ -83,6 +96,9 @@ export interface AppointmentQueryFilter {
   email?: string | undefined;
   provider?: string | undefined;
   serviceType?: AppointmentServiceType | undefined;
+  q?: string | undefined;
+  sortBy?: AppointmentSortField | undefined;
+  sortOrder?: SortOrder | undefined;
   page?: number | undefined;
   limit?: number | undefined;
 }

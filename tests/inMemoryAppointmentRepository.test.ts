@@ -119,4 +119,58 @@ describe('InMemoryAppointmentRepository', () => {
     const missing = await repo.delete(999);
     assert.strictEqual(missing, undefined);
   });
+
+  test('findAll() supports full-text search (q) and dynamic sorting (sortBy, sortOrder)', async () => {
+    await repo.create({
+      customer: 'Zara Zebra',
+      email: 'zara@clinic.org',
+      provider: 'Dr. Alpha',
+      serviceType: 'TREATMENT',
+      notes: 'Allergy follow-up required',
+      date: '2026-12-01',
+      time: '15:00',
+      status: 'CONFIRMED'
+    });
+    await repo.create({
+      customer: 'Anna Apfel',
+      email: 'anna@example.com',
+      provider: 'Dr. Weber',
+      serviceType: 'CHECKUP',
+      notes: 'Annual check',
+      date: '2026-11-18',
+      time: '08:30',
+      status: 'PENDING'
+    });
+
+    // Search in notes
+    const byNotes = await repo.findAll({ q: 'allergy' });
+    assert.strictEqual(byNotes.total, 1);
+    assert.strictEqual(byNotes.items[0].customer, 'Zara Zebra');
+
+    // Search in provider
+    const byProvider = await repo.findAll({ q: 'weber' });
+    assert.strictEqual(byProvider.total, 1);
+    assert.strictEqual(byProvider.items[0].customer, 'Anna Apfel');
+
+    // Sort by customer ASC
+    const customerAsc = await repo.findAll({ sortBy: 'customer', sortOrder: 'asc' });
+    assert.deepStrictEqual(
+      customerAsc.items.map((a) => a.customer),
+      ['Anna Apfel', 'Max Mustermann', 'Zara Zebra']
+    );
+
+    // Sort by customer DESC
+    const customerDesc = await repo.findAll({ sortBy: 'customer', sortOrder: 'desc' });
+    assert.deepStrictEqual(
+      customerDesc.items.map((a) => a.customer),
+      ['Zara Zebra', 'Max Mustermann', 'Anna Apfel']
+    );
+
+    // Sort by date DESC
+    const dateDesc = await repo.findAll({ sortBy: 'date', sortOrder: 'desc' });
+    assert.deepStrictEqual(
+      dateDesc.items.map((a) => a.date),
+      ['2026-12-01', '2026-11-20', '2026-11-18']
+    );
+  });
 });

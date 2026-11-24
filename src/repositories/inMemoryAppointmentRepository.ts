@@ -90,13 +90,53 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
       if (filter.serviceType) {
         result = result.filter((item) => item.serviceType === filter.serviceType);
       }
+      if (filter.q && filter.q.trim().length > 0) {
+        const query = filter.q.trim().toLowerCase();
+        result = result.filter(
+          (item) =>
+            item.customer.toLowerCase().includes(query) ||
+            (item.email?.toLowerCase().includes(query) ?? false) ||
+            item.provider.toLowerCase().includes(query) ||
+            (item.notes?.toLowerCase().includes(query) ?? false) ||
+            (item.phone?.toLowerCase().includes(query) ?? false) ||
+            item.serviceType.toLowerCase().includes(query)
+        );
+      }
     }
 
-    // Sort consistently: date ASC, time ASC, id ASC
+    const sortBy = filter?.sortBy ?? 'date';
+    const dir = filter?.sortOrder === 'desc' ? -1 : 1;
+
     result.sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      if (a.time !== b.time) return a.time.localeCompare(b.time);
-      return a.id - b.id;
+      switch (sortBy) {
+        case 'time': {
+          if (a.time !== b.time) return a.time.localeCompare(b.time) * dir;
+          if (a.date !== b.date) return a.date.localeCompare(b.date) * dir;
+          return (a.id - b.id) * dir;
+        }
+        case 'customer': {
+          const cmp = a.customer.toLowerCase().localeCompare(b.customer.toLowerCase());
+          return cmp !== 0 ? cmp * dir : a.id - b.id;
+        }
+        case 'provider': {
+          const cmp = a.provider.toLowerCase().localeCompare(b.provider.toLowerCase());
+          return cmp !== 0 ? cmp * dir : a.id - b.id;
+        }
+        case 'status': {
+          const cmp = a.status.localeCompare(b.status);
+          return cmp !== 0 ? cmp * dir : a.id - b.id;
+        }
+        case 'createdAt': {
+          const cmp = a.createdAt.localeCompare(b.createdAt);
+          return cmp !== 0 ? cmp * dir : a.id - b.id;
+        }
+        case 'date':
+        default: {
+          if (a.date !== b.date) return a.date.localeCompare(b.date) * dir;
+          if (a.time !== b.time) return a.time.localeCompare(b.time) * dir;
+          return (a.id - b.id) * dir;
+        }
+      }
     });
 
     const total = result.length;

@@ -16,6 +16,8 @@ import {
   AppointmentServiceOptions,
   BusinessHoursConfig,
   ALLOWED_SLOT_DURATIONS,
+  ALLOWED_SORT_FIELDS,
+  ALLOWED_SORT_ORDERS,
   DEFAULT_PROVIDER
 } from '../types/appointment.js';
 import { IAppointmentRepository } from '../repositories/appointmentRepository.js';
@@ -914,6 +916,24 @@ export class AppointmentService {
       if (!AppointmentService.ALLOWED_SERVICE_TYPES.includes(filter.serviceType)) {
         return `Query parameter "serviceType" must be one of: ${AppointmentService.ALLOWED_SERVICE_TYPES.join(', ')}.`;
       }
+    }
+
+    if (filter.q !== undefined && filter.q.trim().length > 200) {
+      return 'Query parameter "q" must be at most 200 characters long.';
+    }
+
+    if (
+      filter.sortBy !== undefined &&
+      !(ALLOWED_SORT_FIELDS as readonly string[]).includes(filter.sortBy)
+    ) {
+      return `Query parameter "sortBy" must be one of: ${ALLOWED_SORT_FIELDS.join(', ')}.`;
+    }
+
+    if (
+      filter.sortOrder !== undefined &&
+      !(ALLOWED_SORT_ORDERS as readonly string[]).includes(filter.sortOrder)
+    ) {
+      return `Query parameter "sortOrder" must be one of: ${ALLOWED_SORT_ORDERS.join(', ')}.`;
     }
 
     if (filter.page !== undefined && (!Number.isInteger(filter.page) || filter.page < 1)) {

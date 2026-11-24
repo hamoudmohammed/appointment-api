@@ -683,4 +683,55 @@ describe('HTTP API Endpoints', () => {
     const missing = await fetch(`${baseUrl}/appointments/9999/confirm`, { method: 'POST' });
     assert.strictEqual(missing.status, 404);
   });
+
+  test('GET /appointments supports q search, sortBy, sortOrder, and rejects invalid sort parameters', async () => {
+    await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Alice Smith',
+        provider: 'Dr. Weber',
+        notes: 'Dental cleaning',
+        date: '2026-12-05',
+        time: '09:00'
+      })
+    });
+    await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Zoe Baker',
+        provider: 'Dr. Klein',
+        notes: 'Routine visit',
+        date: '2026-11-15',
+        time: '14:00'
+      })
+    });
+
+    // Search via q across notes
+    const searchRes = await fetch(`${baseUrl}/appointments?q=dental`);
+    assert.strictEqual(searchRes.status, 200);
+    const searchBody = await searchRes.json();
+    assert.strictEqual(searchBody.total, 1);
+    assert.strictEqual(searchBody.data[0].customer, 'Alice Smith');
+
+    // Sort by customer desc
+    const sortedRes = await fetch(`${baseUrl}/appointments?sortBy=customer&sortOrder=desc`);
+    assert.strictEqual(sortedRes.status, 200);
+    const sortedBody = await sortedRes.json();
+    assert.deepStrictEqual(
+      sortedBody.data.map((a: { customer: string }) => a.customer),
+      ['Zoe Baker', 'Max Mustermann', 'Alice Smith']
+    );
+
+    // Invalid sortBy -> 400
+    const badSort = await fetch(`${baseUrl}/appointments?sortBy=invalidField`);
+    assert.strictEqual(badSort.status, 400);
+    assert.strictEqual((await badSort.json()).errorType, 'VALIDATION_ERROR');
+
+    // Invalid sortOrder -> 400
+    const badOrder = await fetch(`${baseUrl}/appointments?sortOrder=sideways`);
+    assert.strictEqual(badOrder.status, 400);
+    assert.strictEqual((await badOrder.json()).errorType, 'VALIDATION_ERROR');
+  });
 });

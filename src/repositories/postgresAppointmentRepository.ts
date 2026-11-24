@@ -4,6 +4,7 @@ import {
   AppointmentStatus,
   AppointmentServiceType,
   AppointmentQueryFilter,
+  AppointmentSortField,
   AppointmentHistoryAction,
   AppointmentHistoryEntry,
   DEFAULT_PROVIDER
@@ -121,6 +122,13 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
       conditions.push(`service_type = $${idx++}`);
       values.push(filter.serviceType);
     }
+    if (filter?.q && filter.q.trim().length > 0) {
+      conditions.push(
+        `(customer ILIKE $${idx} OR COALESCE(email, '') ILIKE $${idx} OR provider ILIKE $${idx} OR COALESCE(notes, '') ILIKE $${idx} OR COALESCE(phone, '') ILIKE $${idx} OR service_type ILIKE $${idx})`
+      );
+      values.push(`%${filter.q.trim()}%`);
+      idx++;
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -132,12 +140,30 @@ export class PostgresAppointmentRepository implements IAppointmentRepository {
     const limit = Math.max(1, filter?.limit ?? 20);
     const offset = (page - 1) * limit;
 
+    const sortColumnMap: Record<AppointmentSortField, string> = {
+      date: 'date',
+      time: 'time',
+      customer: 'LOWER(customer)',
+      provider: 'LOWER(provider)',
+      status: 'status',
+      createdAt: 'created_at'
+    };
+    const sortBy: AppointmentSortField =
+      filter?.sortBy && filter.sortBy in sortColumnMap ? filter.sortBy : 'date';
+    const sortDir = filter?.sortOrder === 'desc' ? 'DESC' : 'ASC';
+    const orderByClause =
+      sortBy === 'date'
+        ? `date ${sortDir}, time ${sortDir}, id ${sortDir}`
+        : sortBy === 'time'
+          ? `time ${sortDir}, date ${sortDir}, id ${sortDir}`
+          : `${sortColumnMap[sortBy]} ${sortDir}, id ASC`;
+
     const queryValues = [...values, limit, offset];
     const dataSql = `
       SELECT id, customer, email, phone, provider, service_type, notes, date, time, status, created_at
       FROM appointments
       ${whereClause}
-      ORDER BY date ASC, time ASC, id ASC
+      ORDER BY ${orderByClause}
       LIMIT $${idx++} OFFSET $${idx++}
     `;
 

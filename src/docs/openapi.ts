@@ -213,7 +213,7 @@ export const openApiSpec = {
             name: 'status',
             in: 'query',
             description: 'Filter by appointment status',
-            schema: { type: 'string', enum: ['CONFIRMED', 'CANCELLED'] }
+            schema: { type: 'string', enum: ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] }
           },
           {
             name: 'customer',
@@ -226,6 +226,24 @@ export const openApiSpec = {
             in: 'query',
             description: 'Case-insensitive filter by provider / staff member name',
             schema: { type: 'string', example: 'Dr. Weber' }
+          },
+          {
+            name: 'q',
+            in: 'query',
+            description: 'Full-text case-insensitive search across customer, email, provider, notes, phone, and service type',
+            schema: { type: 'string', maxLength: 200, example: 'consultation' }
+          },
+          {
+            name: 'sortBy',
+            in: 'query',
+            description: 'Field to sort results by (defaults to date)',
+            schema: { type: 'string', enum: ['date', 'time', 'customer', 'provider', 'status', 'createdAt'], default: 'date' }
+          },
+          {
+            name: 'sortOrder',
+            in: 'query',
+            description: 'Sort direction (defaults to asc)',
+            schema: { type: 'string', enum: ['asc', 'desc'], default: 'asc' }
           }
         ],
         responses: {
