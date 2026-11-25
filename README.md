@@ -22,7 +22,9 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
   - `services/notificationService.ts`: Event-driven architecture utilizing Node.js `EventEmitter` to dispatch domain events (`appointment:created`, `appointment:cancelled`, `appointment:rescheduled`, `appointment:completed`) and generate automated customer notifications.
   - `utils/exporter.ts`: RFC 5545 iCalendar (`.ics`) generation for Google Calendar/Outlook import and RFC 4180 CSV spreadsheet export.
   - `db/`: Connection pooling (`pg.Pool`), automated schema verification, index optimization, and graceful connection teardown.
-  - `app.ts`: HTTP request dispatcher, payload size security limits, and standardized JSON responses.
+  - `http/helpers.ts`: Shared HTTP primitives (1 MB-bounded JSON body parsing, standardized JSON/HTML/attachment responses, query-filter parsing, and service error status mapping).
+  - `routes/appointmentRoutes.ts`: Modular route handlers for all `/appointments` endpoints decoupled from server middleware concerns.
+  - `app.ts`: Core HTTP request pipeline (correlation IDs, security/CORS headers, structured logging, Prometheus metrics, rate limiting, health probes, Swagger UI, and route delegation).
   - `server.ts`: Server bootstrapping, dependency injection, environment port binding, and graceful shutdown handling (`SIGTERM`/`SIGINT`).
 - **Resilience & Concurrency Safety:** 
   - **Zero Race Conditions & Multi-Provider Isolation:** Double-booking prevention per provider is enforced both in the application domain layer and at the database engine level using a conditional unique index:
