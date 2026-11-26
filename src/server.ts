@@ -19,9 +19,13 @@ let server: Server;
 let pool: pg.Pool | undefined;
 
 async function bootstrap(): Promise<void> {
+  const serviceOptions = AppointmentService.getOptionsFromEnv();
+
   if (USE_IN_MEMORY) {
     console.log('[appointment-api] Running with In-Memory storage (USE_IN_MEMORY=true).');
-    setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
+    setAppointmentService(
+      new AppointmentService(new InMemoryAppointmentRepository(), undefined, serviceOptions)
+    );
     setDatabaseHealthChecker(() => checkDatabaseHealth(undefined));
   } else {
     const config = getDatabaseConfig();
@@ -32,7 +36,7 @@ async function bootstrap(): Promise<void> {
       pool = createDatabasePool(config);
       await initializeDatabase(pool);
       const postgresRepo = new PostgresAppointmentRepository(pool);
-      setAppointmentService(new AppointmentService(postgresRepo));
+      setAppointmentService(new AppointmentService(postgresRepo, undefined, serviceOptions));
       setDatabaseHealthChecker(() => checkDatabaseHealth(pool));
       console.log('[appointment-api] Successfully connected to PostgreSQL and initialized repository.');
     } catch (err) {
@@ -47,7 +51,9 @@ async function bootstrap(): Promise<void> {
           '[appointment-api] (To connect with PostgreSQL, start Docker Desktop and run: docker compose up -d)'
         );
         pool = undefined;
-        setAppointmentService(new AppointmentService(new InMemoryAppointmentRepository()));
+        setAppointmentService(
+          new AppointmentService(new InMemoryAppointmentRepository(), undefined, serviceOptions)
+        );
         setDatabaseHealthChecker(() => checkDatabaseHealth(undefined));
       }
     }

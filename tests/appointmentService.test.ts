@@ -741,4 +741,60 @@ describe('AppointmentService', () => {
       assert.match(tooLongQ.error || '', /"q"/i);
     });
   });
+
+  describe('AppointmentService.getOptionsFromEnv()', () => {
+    test('parses valid business hours, slot duration, and past-booking flag from env', async () => {
+      const options = AppointmentService.getOptionsFromEnv({
+        BUSINESS_HOURS_START: '09:00',
+        BUSINESS_HOURS_END: '18:00',
+        SLOT_DURATION_MINUTES: '60',
+        PREVENT_PAST_BOOKING: 'true'
+      });
+
+      assert.deepStrictEqual(options.businessHours, {
+        start: '09:00',
+        end: '18:00',
+        slotDurationMinutes: 60
+      });
+      assert.strictEqual(options.allowPastDates, false);
+
+      const configuredService = new AppointmentService(
+        new InMemoryAppointmentRepository([]),
+        undefined,
+        {
+          ...options,
+          now: () => new Date('2026-11-26T10:00:00.000Z')
+        }
+      );
+
+      const tooEarly = await configuredService.create({
+        customer: 'Early Bird',
+        date: '2026-11-27',
+        time: '08:30'
+      });
+      assert.strictEqual(tooEarly.success, false);
+      assert.match(tooEarly.error || '', /09:00 - 18:00/);
+
+      const slots = await configuredService.getAvailableSlots('2026-11-27');
+      assert.strictEqual(slots.success, true);
+      assert.strictEqual(slots.data?.totalSlots, 9);
+      assert.strictEqual(slots.data?.availableSlots[0], '09:00');
+    });
+
+    test('falls back to safe defaults on invalid or reversed env values', () => {
+      const options = AppointmentService.getOptionsFromEnv({
+        BUSINESS_HOURS_START: '19:00',
+        BUSINESS_HOURS_END: '08:00',
+        SLOT_DURATION_MINUTES: '25',
+        PREVENT_PAST_BOOKING: 'false'
+      });
+
+      assert.deepStrictEqual(options.businessHours, {
+        start: '08:00',
+        end: '17:00',
+        slotDurationMinutes: 30
+      });
+      assert.strictEqual(options.allowPastDates, true);
+    });
+  });
 });

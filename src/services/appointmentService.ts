@@ -102,6 +102,44 @@ export class AppointmentService {
     slotDurationMinutes: 30
   };
 
+  public static getOptionsFromEnv(env: Record<string, string | undefined> = process.env): AppointmentServiceOptions {
+    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const rawStart = env.BUSINESS_HOURS_START?.trim();
+    const rawEnd = env.BUSINESS_HOURS_END?.trim();
+    const rawDuration = env.SLOT_DURATION_MINUTES?.trim();
+
+    let start = AppointmentService.BUSINESS_HOURS.start;
+    let end = AppointmentService.BUSINESS_HOURS.end;
+
+    const candidateStart = rawStart && timeRegex.test(rawStart) ? rawStart : start;
+    const candidateEnd = rawEnd && timeRegex.test(rawEnd) ? rawEnd : end;
+
+    if (AppointmentService.timeToMinutes(candidateStart) < AppointmentService.timeToMinutes(candidateEnd)) {
+      start = candidateStart;
+      end = candidateEnd;
+    }
+
+    let slotDurationMinutes = AppointmentService.BUSINESS_HOURS.slotDurationMinutes;
+    if (rawDuration) {
+      const parsedDuration = Number(rawDuration);
+      if (
+        Number.isInteger(parsedDuration) &&
+        (ALLOWED_SLOT_DURATIONS as readonly number[]).includes(parsedDuration)
+      ) {
+        slotDurationMinutes = parsedDuration;
+      }
+    }
+
+    return {
+      businessHours: {
+        start,
+        end,
+        slotDurationMinutes
+      },
+      allowPastDates: env.PREVENT_PAST_BOOKING !== 'true'
+    };
+  }
+
   private static timeToMinutes(timeStr: string): number {
     const [h, m] = timeStr.split(':').map(Number);
     return h * 60 + m;
