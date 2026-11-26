@@ -750,4 +750,31 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(bad.status, 400);
     assert.strictEqual((await bad.json()).errorType, 'VALIDATION_ERROR');
   });
+
+  test('GET /appointments/upcoming returns active appointments in window and validates params', async () => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    await fetch(`${baseUrl}/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: 'Upcoming Patient',
+        provider: 'Dr. Weber',
+        date: tomorrow,
+        time: '11:00'
+      })
+    });
+
+    const res = await fetch(`${baseUrl}/appointments/upcoming?days=3&provider=Dr.%20Weber`);
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.window.from);
+    assert.ok(body.window.to);
+    assert.strictEqual(body.total, 1);
+    assert.strictEqual(body.data[0].customer, 'Upcoming Patient');
+
+    // Both days and hours -> 400
+    const bad = await fetch(`${baseUrl}/appointments/upcoming?days=7&hours=12`);
+    assert.strictEqual(bad.status, 400);
+    assert.strictEqual((await bad.json()).errorType, 'VALIDATION_ERROR');
+  });
 });

@@ -107,6 +107,27 @@ export async function handleAppointmentRoutes(
     return true;
   }
 
+  // GET /appointments/upcoming
+  if (method === 'GET' && pathname === '/appointments/upcoming') {
+    const daysParam = url.searchParams.get('days');
+    const hoursParam = url.searchParams.get('hours');
+    const limitParam = url.searchParams.get('limit');
+    const provider = url.searchParams.get('provider') ?? undefined;
+
+    const result = await service.getUpcoming({
+      days: daysParam !== null ? Number(daysParam) : undefined,
+      hours: hoursParam !== null ? Number(hoursParam) : undefined,
+      limit: limitParam !== null ? Number(limitParam) : undefined,
+      provider
+    });
+    if (!result.success) {
+      sendJson(res, 400, { error: result.error, errorType: result.errorType });
+      return true;
+    }
+    sendJson(res, 200, result.data);
+    return true;
+  }
+
   // GET /appointments/stats
   if (method === 'GET' && pathname === '/appointments/stats') {
     const startDate = url.searchParams.get('startDate') ?? undefined;

@@ -148,6 +148,22 @@ export interface NextAvailableSlotResult {
   nextAvailable: { date: string; time: string } | null;
 }
 
+export interface UpcomingAppointmentsFilter {
+  days?: number | undefined;
+  hours?: number | undefined;
+  provider?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface UpcomingAppointmentsResult {
+  window: {
+    from: string;
+    to: string;
+  };
+  total: number;
+  data: Appointment[];
+}
+
 export interface AppointmentStatsFilter {
   startDate?: string | undefined;
   endDate?: string | undefined;

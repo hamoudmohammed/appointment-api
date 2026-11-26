@@ -492,6 +492,71 @@ export const openApiSpec = {
         }
       }
     },
+    '/appointments/upcoming': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'List upcoming active appointments within a time window',
+        description: 'Returns upcoming CONFIRMED and PENDING appointments ordered chronologically within the next N days (default 7) or N hours.',
+        parameters: [
+          {
+            name: 'days',
+            in: 'query',
+            description: 'Lookahead window in days (1-90, defaults to 7; mutually exclusive with hours)',
+            schema: { type: 'integer', minimum: 1, maximum: 90, default: 7 }
+          },
+          {
+            name: 'hours',
+            in: 'query',
+            description: 'Lookahead window in hours (1-168; mutually exclusive with days)',
+            schema: { type: 'integer', minimum: 1, maximum: 168 }
+          },
+          {
+            name: 'provider',
+            in: 'query',
+            description: 'Optional case-insensitive provider filter',
+            schema: { type: 'string', example: 'Dr. Weber' }
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            description: 'Maximum number of appointments to return (1-100, defaults to 20)',
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Upcoming active appointments within the requested window',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    window: {
+                      type: 'object',
+                      properties: {
+                        from: { type: 'string', format: 'date-time' },
+                        to: { type: 'string', format: 'date-time' }
+                      }
+                    },
+                    total: { type: 'integer', example: 2 },
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Appointment' }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Invalid query parameters',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
+    },
     '/appointments/stats': {
       get: {
         tags: ['Appointments'],

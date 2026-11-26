@@ -10,6 +10,8 @@ import {
   AvailableSlotsResult,
   NextAvailableSlotFilter,
   NextAvailableSlotResult,
+  UpcomingAppointmentsFilter,
+  UpcomingAppointmentsResult,
   SlotInfo,
   AppointmentStatsFilter,
   AppointmentStatsResult,
@@ -377,6 +379,99 @@ export class AppointmentService {
         searchedFromDate: fromDate,
         daysSearched: daysAhead,
         nextAvailable: null
+      }
+    };
+  }
+
+  public async getUpcoming(
+    filter: UpcomingAppointmentsFilter = {}
+  ): Promise<ServiceResult<UpcomingAppointmentsResult>> {
+    if (filter.days !== undefined && filter.hours !== undefined) {
+      return {
+        success: false,
+        error: 'Specify either "days" or "hours", not both.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (
+      filter.days !== undefined &&
+      (!Number.isInteger(filter.days) || filter.days < 1 || filter.days > 90)
+    ) {
+      return {
+        success: false,
+        error: 'Query parameter "days" must be an integer between 1 and 90.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (
+      filter.hours !== undefined &&
+      (!Number.isInteger(filter.hours) || filter.hours < 1 || filter.hours > 168)
+    ) {
+      return {
+        success: false,
+        error: 'Query parameter "hours" must be an integer between 1 and 168.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const limit = filter.limit ?? 20;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return {
+        success: false,
+        error: 'Query parameter "limit" must be an integer between 1 and 100.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    if (filter.provider !== undefined) {
+      const trimmed = filter.provider.trim();
+      if (trimmed.length === 0 || trimmed.length > 100) {
+        return {
+          success: false,
+          error: 'Query parameter "provider" must be a non-empty string of at most 100 characters.',
+          errorType: 'VALIDATION_ERROR'
+        };
+      }
+    }
+
+    const fromDate = this.nowProvider();
+    const windowMs =
+      filter.hours !== undefined
+        ? filter.hours * 60 * 60 * 1000
+        : (filter.days ?? 7) * 24 * 60 * 60 * 1000;
+    const toDate = new Date(fromDate.getTime() + windowMs);
+
+    const { items } = await this.repository.findAll({
+      startDate: fromDate.toISOString().split('T')[0],
+      endDate: toDate.toISOString().split('T')[0],
+      provider: filter.provider,
+      sortBy: 'date',
+      sortOrder: 'asc',
+      page: 1,
+      limit: 10000
+    });
+
+    const fromMs = fromDate.getTime();
+    const toMs = toDate.getTime();
+    const upcoming = items.filter((item) => {
+      if (item.status !== 'CONFIRMED' && item.status !== 'PENDING') {
+        return false;
+      }
+      const apptMs = Date.parse(`${item.date}T${item.time}:00.000Z`);
+      return apptMs >= fromMs && apptMs <= toMs;
+    });
+
+    return {
+      success: true,
+      data: {
+        window: {
+          from: fromDate.toISOString(),
+          to: toDate.toISOString()
+        },
+        total: upcoming.length,
+        data: upcoming.slice(0, limit)
       }
     };
   }

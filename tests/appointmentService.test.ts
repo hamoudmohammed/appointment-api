@@ -864,4 +864,97 @@ describe('AppointmentService', () => {
       assert.strictEqual(badTime.errorType, 'VALIDATION_ERROR');
     });
   });
+
+  describe('getUpcoming()', () => {
+    test('returns only active CONFIRMED/PENDING appointments within days or hours window', async () => {
+      const repo = new InMemoryAppointmentRepository([
+        {
+          id: 1,
+          customer: 'Past Client',
+          provider: 'Dr. Weber',
+          serviceType: 'CONSULTATION',
+          date: '2026-11-26',
+          time: '08:00',
+          status: 'CONFIRMED',
+          createdAt: '2026-11-20T10:00:00.000Z'
+        },
+        {
+          id: 2,
+          customer: 'Soon Confirmed',
+          provider: 'Dr. Weber',
+          serviceType: 'CONSULTATION',
+          date: '2026-11-26',
+          time: '12:00',
+          status: 'CONFIRMED',
+          createdAt: '2026-11-20T10:00:00.000Z'
+        },
+        {
+          id: 3,
+          customer: 'Cancelled Soon',
+          provider: 'Dr. Weber',
+          serviceType: 'CHECKUP',
+          date: '2026-11-26',
+          time: '13:00',
+          status: 'CANCELLED',
+          createdAt: '2026-11-20T10:00:00.000Z'
+        },
+        {
+          id: 4,
+          customer: 'Pending Next Week',
+          provider: 'Dr. Weber',
+          serviceType: 'FOLLOW_UP',
+          date: '2026-11-30',
+          time: '10:00',
+          status: 'PENDING',
+          createdAt: '2026-11-20T10:00:00.000Z'
+        },
+        {
+          id: 5,
+          customer: 'Far Future',
+          provider: 'Dr. Weber',
+          serviceType: 'TREATMENT',
+          date: '2026-12-25',
+          time: '10:00',
+          status: 'CONFIRMED',
+          createdAt: '2026-11-20T10:00:00.000Z'
+        }
+      ]);
+      const localService = new AppointmentService(repo, undefined, {
+        now: () => new Date('2026-11-26T10:00:00.000Z')
+      });
+
+      // Default 7-day window -> id 2 and id 4
+      const weekRes = await localService.getUpcoming({ provider: 'Dr. Weber' });
+      assert.strictEqual(weekRes.success, true);
+      assert.strictEqual(weekRes.data?.total, 2);
+      assert.deepStrictEqual(
+        weekRes.data?.data.map((a) => a.id),
+        [2, 4]
+      );
+
+      // 4-hour window -> only id 2 (12:00)
+      const hoursRes = await localService.getUpcoming({ hours: 4 });
+      assert.strictEqual(hoursRes.success, true);
+      assert.strictEqual(hoursRes.data?.total, 1);
+      assert.strictEqual(hoursRes.data?.data[0].id, 2);
+    });
+
+    test('validates mutually exclusive days/hours and bounds', async () => {
+      const both = await service.getUpcoming({ days: 7, hours: 24 });
+      assert.strictEqual(both.success, false);
+      assert.strictEqual(both.errorType, 'VALIDATION_ERROR');
+
+      const badDays = await service.getUpcoming({ days: 120 });
+      assert.strictEqual(badDays.success, false);
+      assert.strictEqual(badDays.errorType, 'VALIDATION_ERROR');
+
+      const badHours = await service.getUpcoming({ hours: 0 });
+      assert.strictEqual(badHours.success, false);
+      assert.strictEqual(badHours.errorType, 'VALIDATION_ERROR');
+
+      const badLimit = await service.getUpcoming({ limit: 500 });
+      assert.strictEqual(badLimit.success, false);
+      assert.strictEqual(badLimit.errorType, 'VALIDATION_ERROR');
+    });
+  });
 });
