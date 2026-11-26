@@ -8,6 +8,8 @@ import {
   AppointmentQueryFilter,
   PaginatedAppointmentsResult,
   AvailableSlotsResult,
+  NextAvailableSlotFilter,
+  NextAvailableSlotResult,
   SlotInfo,
   AppointmentStatsFilter,
   AppointmentStatsResult,
@@ -253,6 +255,128 @@ export class AppointmentService {
         bookedCount,
         availableSlots,
         slots
+      }
+    };
+  }
+
+  private static addDaysIso(dateStr: string, days: number): string {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day + days)).toISOString().split('T')[0];
+  }
+
+  public async getNextAvailableSlot(
+    filter: NextAvailableSlotFilter = {}
+  ): Promise<ServiceResult<NextAvailableSlotResult>> {
+    const now = this.nowProvider();
+    const todayIso = now.toISOString().split('T')[0];
+    const nowTimeStr = now.toISOString().slice(11, 16);
+
+    const fromDate = filter.fromDate ?? todayIso;
+    if (!AppointmentService.isValidCalendarDate(fromDate)) {
+      return {
+        success: false,
+        error: 'Query parameter "fromDate" must be a valid calendar date in YYYY-MM-DD format.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (filter.fromTime !== undefined && !timeRegex.test(filter.fromTime)) {
+      return {
+        success: false,
+        error: 'Query parameter "fromTime" must follow HH:mm (24h) format.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const daysAhead = filter.daysAhead ?? 14;
+    if (!Number.isInteger(daysAhead) || daysAhead < 1 || daysAhead > 30) {
+      return {
+        success: false,
+        error: 'Query parameter "daysAhead" must be an integer between 1 and 30.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const effectiveDuration = filter.slotDuration ?? this.businessHours.slotDurationMinutes;
+    if (
+      !Number.isInteger(effectiveDuration) ||
+      !(ALLOWED_SLOT_DURATIONS as readonly number[]).includes(effectiveDuration)
+    ) {
+      return {
+        success: false,
+        error: `Query parameter "slotDuration" must be one of: ${ALLOWED_SLOT_DURATIONS.join(', ')} (minutes).`,
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const targetProvider = filter.provider !== undefined ? filter.provider.trim() : DEFAULT_PROVIDER;
+    if (targetProvider.length === 0 || targetProvider.length > 100) {
+      return {
+        success: false,
+        error: 'Query parameter "provider" must be a non-empty string of at most 100 characters.',
+        errorType: 'VALIDATION_ERROR'
+      };
+    }
+
+    const endDate = AppointmentService.addDaysIso(fromDate, daysAhead - 1);
+    const { items } = await this.repository.findAll({
+      startDate: fromDate,
+      endDate,
+      status: 'CONFIRMED',
+      provider: targetProvider,
+      page: 1,
+      limit: 10000
+    });
+
+    const normalizedProvider = targetProvider.toLowerCase();
+    const bookedByDate = new Map<string, Set<string>>();
+    for (const item of items) {
+      if (item.provider.toLowerCase() !== normalizedProvider) continue;
+      let set = bookedByDate.get(item.date);
+      if (!set) {
+        set = new Set<string>();
+        bookedByDate.set(item.date, set);
+      }
+      set.add(item.time);
+    }
+
+    const dailySlots = this.generateDailySlots(effectiveDuration);
+    const effectiveFromTime =
+      filter.fromTime ?? (fromDate === todayIso ? nowTimeStr : undefined);
+
+    for (let offset = 0; offset < daysAhead; offset++) {
+      const candidateDate = AppointmentService.addDaysIso(fromDate, offset);
+      const booked = bookedByDate.get(candidateDate);
+      const minTime = offset === 0 ? effectiveFromTime : undefined;
+
+      for (const slot of dailySlots) {
+        if (minTime && slot < minTime) continue;
+        if (!booked?.has(slot)) {
+          return {
+            success: true,
+            data: {
+              found: true,
+              provider: targetProvider,
+              slotDurationMinutes: effectiveDuration,
+              searchedFromDate: fromDate,
+              daysSearched: offset + 1,
+              nextAvailable: { date: candidateDate, time: slot }
+            }
+          };
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        found: false,
+        provider: targetProvider,
+        slotDurationMinutes: effectiveDuration,
+        searchedFromDate: fromDate,
+        daysSearched: daysAhead,
+        nextAvailable: null
       }
     };
   }

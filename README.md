@@ -55,6 +55,7 @@ A clean, production-ready REST API for appointment scheduling built with **TypeS
 | `GET` | `/metrics` | Prometheus metrics for cloud monitoring and Grafana scraping | `200` |
 | `GET` | `/appointments` | List appointments (supports `page`, `limit`, `date`, `startDate`, `endDate`, `status`, `customer`, `provider`, `serviceType`, `email`, `q`, `sortBy`, `sortOrder`) | `200`, `400` |
 | `GET` | `/appointments/slots` | Discover available and booked time slots for a given date, optional `provider`, and `slotDuration` (`15`, `30`, `45`, `60`) | `200`, `400` |
+| `GET` | `/appointments/next-available` | Find the earliest open slot across upcoming days for a `provider` and `slotDuration` | `200`, `400` |
 | `GET` | `/appointments/stats` | Aggregated appointment analytics (counts by status/service/provider, rates, busiest slots/dates) | `200`, `400` |
 | `GET` | `/appointments/export` | Export appointments schedule in CSV or iCalendar (`.ics`) format | `200`, `400` |
 | `GET` | `/appointments/:id` | Retrieve an appointment by numerical ID | `200`, `404` |

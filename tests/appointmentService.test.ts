@@ -797,4 +797,71 @@ describe('AppointmentService', () => {
       assert.strictEqual(options.allowPastDates, true);
     });
   });
+
+  describe('getNextAvailableSlot()', () => {
+    test('skips booked slots and rolls over to the next day when a day is full', async () => {
+      const repo = new InMemoryAppointmentRepository([]);
+      const localService = new AppointmentService(repo, undefined, {
+        businessHours: { start: '09:00', end: '11:00', slotDurationMinutes: 60 },
+        now: () => new Date('2026-11-26T08:00:00.000Z')
+      });
+
+      // Book both slots on 2026-11-26 for Dr. Weber (09:00 and 10:00)
+      await localService.create({
+        customer: 'Patient 1',
+        provider: 'Dr. Weber',
+        date: '2026-11-26',
+        time: '09:00'
+      });
+      await localService.create({
+        customer: 'Patient 2',
+        provider: 'Dr. Weber',
+        date: '2026-11-26',
+        time: '10:00'
+      });
+
+      // Next available for Dr. Weber rolls over to 2026-11-27 09:00
+      const res = await localService.getNextAvailableSlot({
+        fromDate: '2026-11-26',
+        provider: 'Dr. Weber',
+        slotDuration: 60,
+        daysAhead: 5
+      });
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data?.found, true);
+      assert.strictEqual(res.data?.daysSearched, 2);
+      assert.deepStrictEqual(res.data?.nextAvailable, { date: '2026-11-27', time: '09:00' });
+
+      // When daysAhead=1 and day 1 is full -> found: false
+      const noneFound = await localService.getNextAvailableSlot({
+        fromDate: '2026-11-26',
+        provider: 'Dr. Weber',
+        slotDuration: 60,
+        daysAhead: 1
+      });
+      assert.strictEqual(noneFound.success, true);
+      assert.strictEqual(noneFound.data?.found, false);
+      assert.strictEqual(noneFound.data?.nextAvailable, null);
+    });
+
+    test('skips elapsed times on current day and validates query parameters', async () => {
+      const localService = new AppointmentService(
+        new InMemoryAppointmentRepository([]),
+        undefined,
+        { now: () => new Date('2026-11-26T10:15:00.000Z') }
+      );
+
+      const res = await localService.getNextAvailableSlot();
+      assert.strictEqual(res.success, true);
+      assert.deepStrictEqual(res.data?.nextAvailable, { date: '2026-11-26', time: '10:30' });
+
+      const badDays = await localService.getNextAvailableSlot({ daysAhead: 50 });
+      assert.strictEqual(badDays.success, false);
+      assert.strictEqual(badDays.errorType, 'VALIDATION_ERROR');
+
+      const badTime = await localService.getNextAvailableSlot({ fromTime: '25:99' });
+      assert.strictEqual(badTime.success, false);
+      assert.strictEqual(badTime.errorType, 'VALIDATION_ERROR');
+    });
+  });
 });

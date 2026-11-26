@@ -420,6 +420,78 @@ export const openApiSpec = {
         }
       }
     },
+    '/appointments/next-available': {
+      get: {
+        tags: ['Appointments'],
+        summary: 'Find the earliest available booking slot',
+        description: 'Searches day-by-day starting from fromDate (defaults to today) across up to daysAhead days to find the earliest open slot for a provider.',
+        parameters: [
+          {
+            name: 'fromDate',
+            in: 'query',
+            description: 'Start date to search from (YYYY-MM-DD, defaults to today)',
+            schema: { type: 'string', format: 'date', example: '2026-11-26' }
+          },
+          {
+            name: 'fromTime',
+            in: 'query',
+            description: 'Minimum time on the first day (HH:mm 24h)',
+            schema: { type: 'string', example: '10:00' }
+          },
+          {
+            name: 'provider',
+            in: 'query',
+            description: 'Provider name (defaults to "General")',
+            schema: { type: 'string', example: 'Dr. Weber' }
+          },
+          {
+            name: 'slotDuration',
+            in: 'query',
+            description: 'Slot duration in minutes (15, 30, 45, or 60)',
+            schema: { type: 'integer', enum: [15, 30, 45, 60], default: 30 }
+          },
+          {
+            name: 'daysAhead',
+            in: 'query',
+            description: 'Maximum number of days to search (1-30, defaults to 14)',
+            schema: { type: 'integer', minimum: 1, maximum: 30, default: 14 }
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Next available slot result',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    found: { type: 'boolean', example: true },
+                    provider: { type: 'string', example: 'Dr. Weber' },
+                    slotDurationMinutes: { type: 'integer', example: 30 },
+                    searchedFromDate: { type: 'string', example: '2026-11-26' },
+                    daysSearched: { type: 'integer', example: 1 },
+                    nextAvailable: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        date: { type: 'string', example: '2026-11-26' },
+                        time: { type: 'string', example: '10:30' }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Invalid query parameters',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } }
+            }
+          }
+        }
+      }
+    },
     '/appointments/stats': {
       get: {
         tags: ['Appointments'],

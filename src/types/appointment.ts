@@ -131,6 +131,23 @@ export interface AvailableSlotsResult {
   slots: SlotInfo[];
 }
 
+export interface NextAvailableSlotFilter {
+  fromDate?: string | undefined;
+  fromTime?: string | undefined;
+  provider?: string | undefined;
+  slotDuration?: number | undefined;
+  daysAhead?: number | undefined;
+}
+
+export interface NextAvailableSlotResult {
+  found: boolean;
+  provider: string;
+  slotDurationMinutes: number;
+  searchedFromDate: string;
+  daysSearched: number;
+  nextAvailable: { date: string; time: string } | null;
+}
+
 export interface AppointmentStatsFilter {
   startDate?: string | undefined;
   endDate?: string | undefined;

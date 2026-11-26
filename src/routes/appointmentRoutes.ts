@@ -84,6 +84,29 @@ export async function handleAppointmentRoutes(
     return true;
   }
 
+  // GET /appointments/next-available
+  if (method === 'GET' && pathname === '/appointments/next-available') {
+    const fromDate = url.searchParams.get('fromDate') ?? undefined;
+    const fromTime = url.searchParams.get('fromTime') ?? undefined;
+    const provider = url.searchParams.get('provider') ?? undefined;
+    const slotDurationParam = url.searchParams.get('slotDuration');
+    const daysAheadParam = url.searchParams.get('daysAhead');
+
+    const result = await service.getNextAvailableSlot({
+      fromDate,
+      fromTime,
+      provider,
+      slotDuration: slotDurationParam !== null ? Number(slotDurationParam) : undefined,
+      daysAhead: daysAheadParam !== null ? Number(daysAheadParam) : undefined
+    });
+    if (!result.success) {
+      sendJson(res, 400, { error: result.error, errorType: result.errorType });
+      return true;
+    }
+    sendJson(res, 200, result.data);
+    return true;
+  }
+
   // GET /appointments/stats
   if (method === 'GET' && pathname === '/appointments/stats') {
     const startDate = url.searchParams.get('startDate') ?? undefined;

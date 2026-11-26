@@ -734,4 +734,20 @@ describe('HTTP API Endpoints', () => {
     assert.strictEqual(badOrder.status, 400);
     assert.strictEqual((await badOrder.json()).errorType, 'VALIDATION_ERROR');
   });
+
+  test('GET /appointments/next-available returns earliest open slot and validates params', async () => {
+    // 2026-11-20 10:00 is booked for General; starting at 10:00 should return 10:30
+    const res = await fetch(
+      `${baseUrl}/appointments/next-available?fromDate=2026-11-20&fromTime=10:00&provider=General&slotDuration=30`
+    );
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.found, true);
+    assert.deepStrictEqual(body.nextAvailable, { date: '2026-11-20', time: '10:30' });
+
+    // Invalid daysAhead -> 400
+    const bad = await fetch(`${baseUrl}/appointments/next-available?daysAhead=99`);
+    assert.strictEqual(bad.status, 400);
+    assert.strictEqual((await bad.json()).errorType, 'VALIDATION_ERROR');
+  });
 });
